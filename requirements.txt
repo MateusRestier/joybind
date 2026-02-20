@@ -1,0 +1,5 @@
+# JoyBind — dependências
+customtkinter>=5.2.0   # GUI moderna sobre tkinter
+pygame>=2.5.0          # Leitura confiável de controles/joysticks
+pyautogui>=0.9.54      # Simulação de teclado e mouse
+pynput>=1.7.6          # Captura de teclas pressionadas (para o bind wizard)
