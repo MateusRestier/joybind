@@ -51,9 +51,9 @@ def _normalize_key(key) -> str:
 # ── Definição das ações disponíveis na timeline ───────────────────────────────
 
 # Mapeamento action_id → rótulo exibido na UI
+# save_mouse / restore_mouse não aparecem no dropdown:
+# são gerenciados automaticamente pela checkbox de "Mover mouse".
 _STEP_ACTION_LABELS: dict[str, str] = {
-    "save_mouse":    "Salvar posição do mouse",
-    "restore_mouse": "Restaurar posição do mouse",
     "move_mouse":    "Mover mouse → X, Y",
     "click_left":    "Clique esquerdo",
     "click_right":   "Clique direito",
@@ -288,28 +288,35 @@ class BindDialog:
         self._render_step({"action": action})
 
     def _render_step(self, step_data: dict) -> None:
-        """Constrói e adiciona uma linha de passo na timeline."""
+        """
+        Constrói uma linha de passo na timeline com layout de 2 linhas:
+
+          Linha 0: [nº]  [Seletor de tipo de ação ▼]  [↑][↓][✕]
+          Linha 1:       [Parâmetros — largura total disponível   ]
+
+        Isso evita o problema de widgets de parâmetros ficarem sem espaço
+        e se sobrepondo aos botões de controle quando há um layout só de 1 linha.
+        """
         idx = len(self._seq_steps)
 
         row = ctk.CTkFrame(self._seq_scroll, corner_radius=6, fg_color=("gray85", "gray23"))
         row.pack(fill="x", padx=4, pady=3)
-        row.grid_columnconfigure(2, weight=1)  # Coluna de params se expande
+        row.grid_columnconfigure(1, weight=1)  # Coluna do action_menu expande
 
-        # Badge de número do passo
+        # ── Linha 0 ───────────────────────────────────────────────
         num_lbl = ctk.CTkLabel(
             row, text=str(idx + 1), width=22,
             font=ctk.CTkFont(size=10, weight="bold"),
             text_color=("gray50", "gray50"),
         )
-        num_lbl.grid(row=0, column=0, padx=(8, 2), pady=8)
+        num_lbl.grid(row=0, column=0, padx=(8, 2), pady=(7, 2), sticky="n")
 
-        # Seletor do tipo de ação (OptionMenu)
         action = step_data.get("action", "click_left")
         action_var = ctk.StringVar(value=_STEP_ACTION_LABELS.get(action, action))
 
-        # Frame inline para parâmetros (preenchido dinamicamente)
+        # ── Linha 1: parâmetros com largura total (menos o badge) ─
         param_frame = ctk.CTkFrame(row, fg_color="transparent")
-        param_frame.grid(row=0, column=2, sticky="ew", padx=4, pady=8)
+        param_frame.grid(row=1, column=0, columnspan=3, sticky="ew", padx=(34, 8), pady=(0, 7))
 
         widgets: dict = {}
         self._render_step_params(param_frame, action, step_data, widgets)
@@ -328,14 +335,14 @@ class BindDialog:
 
         action_menu = ctk.CTkOptionMenu(
             row, variable=action_var,
-            values=_STEP_LABELS, width=220,
+            values=_STEP_LABELS,
             command=on_action_change,
         )
-        action_menu.grid(row=0, column=1, padx=(2, 4), pady=8)
+        action_menu.grid(row=0, column=1, sticky="ew", padx=(2, 6), pady=(7, 2))
 
-        # Botões de controle (↑ ↓ ✕)
+        # Botões de controle (↑ ↓ ✕) — coluna fixa à direita
         ctrl = ctk.CTkFrame(row, fg_color="transparent")
-        ctrl.grid(row=0, column=3, padx=(2, 8), pady=8)
+        ctrl.grid(row=0, column=2, padx=(0, 8), pady=(7, 2))
 
         ctk.CTkButton(
             ctrl, text="↑", width=28, height=26,
@@ -374,24 +381,41 @@ class BindDialog:
         widgets.clear()
 
         if action == "move_mouse":
-            for label_txt, key, ph in [("X:", "x", "0"), ("  Y:", "y", "0")]:
-                ctk.CTkLabel(parent, text=label_txt).pack(side="left", padx=(4, 2))
-                e = ctk.CTkEntry(parent, width=60, placeholder_text=ph)
-                val = step_data.get(key)
-                if val is not None:
-                    e.insert(0, str(val))
-                e.pack(side="left", padx=(0, 2))
-                widgets[key] = e
+            # X ──────────────────────────────────────────────────────
+            ctk.CTkLabel(parent, text="X:").pack(side="left", padx=(0, 4))
+            x_e = ctk.CTkEntry(parent, width=80, placeholder_text="0")
+            if "x" in step_data:
+                x_e.insert(0, str(step_data["x"]))
+            x_e.pack(side="left", padx=(0, 16))
+            widgets["x"] = x_e
 
+            # Y ──────────────────────────────────────────────────────
+            ctk.CTkLabel(parent, text="Y:").pack(side="left", padx=(0, 4))
+            y_e = ctk.CTkEntry(parent, width=80, placeholder_text="0")
+            if "y" in step_data:
+                y_e.insert(0, str(step_data["y"]))
+            y_e.pack(side="left", padx=(0, 16))
+            widgets["y"] = y_e
+
+            # Botão de captura de posição ────────────────────────────
             cap = ctk.CTkButton(
-                parent, text="📍", width=34,
+                parent, text="📍 Capturar", width=110,
                 fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
             )
-            # Usa lambda com referência tardia ao dict widgets (já populado acima)
             cap.configure(command=lambda b=cap: self._capture_pos_into(
                 widgets["x"], widgets["y"], b
             ))
-            cap.pack(side="left", padx=(4, 0))
+            cap.pack(side="left", padx=(0, 20))
+
+            # Checkbox: salvar posição antes e restaurar ao fim ──────
+            save_var = ctk.BooleanVar(value=bool(step_data.get("save_restore", False)))
+            ctk.CTkCheckBox(
+                parent,
+                text="Salvar e restaurar posição do mouse",
+                variable=save_var,
+                height=20,
+            ).pack(side="left")
+            widgets["save_restore"] = save_var
 
         elif action == "key":
             e = ctk.CTkEntry(parent, width=110, placeholder_text="enter")
@@ -437,6 +461,8 @@ class BindDialog:
             except ValueError: step["x"] = 0
             try:    step["y"] = int(w["y"].get() or 0)
             except ValueError: step["y"] = 0
+            # BooleanVar da checkbox; .get() = True/False
+            step["save_restore"] = bool(w.get("save_restore") and w["save_restore"].get())
 
         elif action == "key":
             step["key"] = w["key"].get().strip() or "enter"
@@ -634,13 +660,13 @@ class BindDialog:
                 self._render_step(step)
 
         elif bind_type == "mouse_combo":
-            # Compatibilidade retroativa: converte para sequência equivalente
+            # Compatibilidade retroativa: converte para sequência equivalente.
+            # "Salvar e restaurar posição" vira a checkbox do move_mouse.
             self._type_var.set("sequence")
             self._rebuild_seq_ui([
-                {"action": "save_mouse"},
-                {"action": "move_mouse", "x": bind.get("x", 0), "y": bind.get("y", 0)},
+                {"action": "move_mouse", "x": bind.get("x", 0), "y": bind.get("y", 0),
+                 "save_restore": True},
                 {"action": "click_left"},
-                {"action": "restore_mouse"},
             ])
 
     # ──────────────────────────────────────────────────────────────
