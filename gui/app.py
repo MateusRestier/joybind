@@ -103,6 +103,14 @@ _SCROLL_SENS_MOUSE_MODE: float = 8.0
 # (60 Hz / 4 = ~15 pressionamentos/s, similar ao auto-repeat padrão do Windows)
 _KEY_REPEAT_FRAMES: int = 4
 
+# Rótulos visuais por btn_key para os tiles do layout do controle
+_BTN_TILE_LABELS: dict[str, str] = {
+    "6": "LT", "4": "LB", "5": "RB", "7": "RT",
+    "12": "↑",  "14": "←", "15": "→", "13": "↓",
+    "8": "◁▷", "9": "☰", "10": "L3", "11": "R3",
+    "3": "△",  "2": "□",  "1": "○",  "0": "×",
+}
+
 
 def _find_sens(stick: dict, target_types: tuple, fallback: float = 600.0) -> float:
     """Retorna a primeira sensibilidade configurada para um dos tipos alvo."""
@@ -328,8 +336,8 @@ class App:
 
     def __init__(self, root: ctk.CTk) -> None:
         self.root = root
-        self.root.geometry("660x660")
-        self.root.minsize(580, 560)
+        self.root.geometry("680x780")
+        self.root.minsize(600, 660)
 
         # ── Presets ──────────────────────────────────────────────────
         self._settings = presets.load_settings()
@@ -344,8 +352,9 @@ class App:
         self.root.title(title)
 
         # ── Estado geral ──────────────────────────────────────────────
-        self._is_listening    = False
-        self._selected_btn_key: str | None = None
+        self._is_listening = False
+        # Tiles clicáveis do layout visual: btn_key → CTkButton
+        self._btn_tiles: dict[str, ctk.CTkButton] = {}
 
         # ── Estado analógico ──────────────────────────────────────────
         self._acc_x:  float = 0.0
@@ -359,7 +368,7 @@ class App:
         # Contador de frames por direção — controla o repeat rate de teclas analógicas
         self._key_hold_frames: dict[tuple, int] = {}
 
-        # Placeholders — populados em _build_analogicos_tab
+        # Placeholders — populados em _build_controller_layout
         self._analog_enabled_var:   ctk.BooleanVar | None        = None
         self._left_stick_frame:     ctk.CTkFrame   | None        = None
         self._right_stick_frame:    ctk.CTkFrame   | None        = None
@@ -373,7 +382,7 @@ class App:
         self._build_ui()
         self._refresh_joystick_dropdown()
         self._refresh_preset_dropdown()
-        self._render_bind_list()
+        self._update_btn_tiles()
         self._render_analog_config()
 
     # ──────────────────────────────────────────────────────────────
@@ -429,7 +438,7 @@ class App:
         self._build_preset_bar()
         self._build_controller_row()
         self._build_status_row()
-        self._build_tabview()
+        self._build_controller_layout()
 
     def _build_header(self) -> None:
         frame = ctk.CTkFrame(self.root, corner_radius=0, fg_color=("gray85", "gray17"))
@@ -507,79 +516,177 @@ class App:
         frame.grid_columnconfigure(2, weight=1)
 
     # ──────────────────────────────────────────────────────────────
-    # TabView
+    # Layout visual do controle (silhueta de gamepad)
     # ──────────────────────────────────────────────────────────────
 
-    def _build_tabview(self) -> None:
-        self._tabview = ctk.CTkTabview(self.root)
-        self._tabview.grid(row=4, column=0, sticky="nsew", padx=12, pady=4)
-        self._tabview.add("Botões")
-        self._tabview.add("Analógicos")
-        self._build_botoes_tab(self._tabview.tab("Botões"))
-        self._build_analogicos_tab(self._tabview.tab("Analógicos"))
+    def _build_controller_layout(self) -> None:
+        """Monta o layout visual de gamepad com todos os botões clicáveis."""
+        outer = ctk.CTkFrame(self.root)
+        outer.grid(row=4, column=0, sticky="nsew", padx=12, pady=4)
+        outer.grid_columnconfigure(0, weight=1)
+        outer.grid_rowconfigure(0, weight=1)
 
-    # ── Tab Botões ────────────────────────────────────────────────
+        scroll = ctk.CTkScrollableFrame(outer, fg_color="transparent")
+        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.grid_columnconfigure(0, weight=1)
 
-    def _build_botoes_tab(self, tab: ctk.CTkFrame) -> None:
-        tab.grid_columnconfigure(0, weight=1)
-        tab.grid_rowconfigure(1, weight=1)
-
-        col_hdr = ctk.CTkFrame(tab, fg_color=("gray75", "gray28"), corner_radius=6)
-        col_hdr.grid(row=0, column=0, sticky="ew", pady=(0, 2))
-        for col_idx, (text, width) in enumerate([("Botão", 90), ("Tipo", 110), ("Ação", 300)]):
-            ctk.CTkLabel(
-                col_hdr, text=text, width=width,
-                font=ctk.CTkFont(size=11, weight="bold"), anchor="w",
-            ).grid(row=0, column=col_idx, padx=10, pady=5, sticky="w")
-
-        self._bind_scroll = ctk.CTkScrollableFrame(tab, corner_radius=6)
-        self._bind_scroll.grid(row=1, column=0, sticky="nsew", pady=(0, 4))
-        self._bind_scroll.grid_columnconfigure(0, weight=1)
-        self._bind_rows: list[dict] = []
-
-        btn_frame = ctk.CTkFrame(tab, fg_color="transparent")
-        btn_frame.grid(row=2, column=0, sticky="ew", pady=(0, 4))
-        ctk.CTkButton(
-            btn_frame, text="+ Adicionar", width=130,
-            command=self._open_add_dialog,
-        ).pack(side="left", padx=(0, 6))
-        self._edit_btn = ctk.CTkButton(
-            btn_frame, text="Editar", width=110,
-            fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
-            state="disabled", command=self._open_edit_dialog,
-        )
-        self._edit_btn.pack(side="left", padx=6)
-        self._del_btn = ctk.CTkButton(
-            btn_frame, text="Remover", width=110,
-            fg_color="#c0392b", hover_color="#a93226",
-            state="disabled", command=self._delete_selected,
-        )
-        self._del_btn.pack(side="left", padx=6)
-
-    # ── Tab Analógicos ────────────────────────────────────────────
-
-    def _build_analogicos_tab(self, tab: ctk.CTkFrame) -> None:
-        tab.grid_columnconfigure(0, weight=1)
-        tab.grid_columnconfigure(1, weight=1)
-        tab.grid_rowconfigure(1, weight=1)
-
-        # Toggle
+        # Inicializa var do toggle antes de _render_analog_config
         analog_cfg = self.cfg.get("analog", {})
         self._analog_enabled_var = ctk.BooleanVar(value=analog_cfg.get("enabled", False))
-        hdr = ctk.CTkFrame(tab, fg_color="transparent")
-        hdr.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(6, 4))
+
+        # 1. Gatilhos / ombros (topo)
+        self._build_trigger_row(scroll)
+
+        # 2. Corpo: D-pad | Centro | Botões de face
+        body = ctk.CTkFrame(scroll, fg_color="transparent")
+        body.pack(fill="x", padx=8, pady=(0, 4))
+        body.grid_columnconfigure((0, 1, 2), weight=1)
+        self._build_dpad_cluster(body)
+        self._build_center_cluster(body)
+        self._build_face_cluster(body)
+
+        # 3. Analógicos (reutiliza _build_stick_panel via _render_analog_config)
+        sticks_outer = ctk.CTkFrame(scroll, fg_color="transparent")
+        sticks_outer.pack(fill="x", padx=8, pady=(4, 8))
+        sticks_outer.grid_columnconfigure((0, 1), weight=1)
+        self._left_stick_frame  = ctk.CTkFrame(sticks_outer)
+        self._right_stick_frame = ctk.CTkFrame(sticks_outer)
+        self._left_stick_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+        self._right_stick_frame.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
+
+    def _build_trigger_row(self, parent: ctk.CTkFrame) -> None:
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", padx=8, pady=(8, 0))
+        left = ctk.CTkFrame(row, fg_color="transparent")
+        left.pack(side="left")
+        self._build_btn_tile(left, "LT", "6", r=0, c=0, w=96, h=48)
+        self._build_btn_tile(left, "LB", "4", r=0, c=1, w=96, h=48)
+        right = ctk.CTkFrame(row, fg_color="transparent")
+        right.pack(side="right")
+        self._build_btn_tile(right, "RB", "5", r=0, c=0, w=96, h=48)
+        self._build_btn_tile(right, "RT", "7", r=0, c=1, w=96, h=48)
+
+    def _build_dpad_cluster(self, parent: ctk.CTkFrame) -> None:
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        frame.grid(row=0, column=0, padx=4, pady=4, sticky="n")
+        ctk.CTkLabel(
+            frame, text="D-Pad",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=("gray55", "gray55"),
+        ).pack(pady=(4, 2))
+        cross = ctk.CTkFrame(frame, fg_color="transparent")
+        cross.pack()
+        W, H = 82, 50
+        self._build_btn_tile(cross, "↑", "12", r=0, c=1, w=W, h=H)
+        self._build_btn_tile(cross, "←", "14", r=1, c=0, w=W, h=H)
+        ctk.CTkLabel(
+            cross, text="D", width=W, height=H,
+            font=ctk.CTkFont(size=18), text_color=("gray45", "gray55"),
+        ).grid(row=1, column=1, padx=3, pady=3)
+        self._build_btn_tile(cross, "→", "15", r=1, c=2, w=W, h=H)
+        self._build_btn_tile(cross, "↓", "13", r=2, c=1, w=W, h=H)
+
+    def _build_face_cluster(self, parent: ctk.CTkFrame) -> None:
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        frame.grid(row=0, column=2, padx=4, pady=4, sticky="n")
+        ctk.CTkLabel(
+            frame, text="Botões",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=("gray55", "gray55"),
+        ).pack(pady=(4, 2))
+        cross = ctk.CTkFrame(frame, fg_color="transparent")
+        cross.pack()
+        W, H = 82, 50
+        self._build_btn_tile(cross, "△", "3", r=0, c=1, w=W, h=H)
+        self._build_btn_tile(cross, "□", "2", r=1, c=0, w=W, h=H)
+        ctk.CTkLabel(
+            cross, text="◎", width=W, height=H,
+            font=ctk.CTkFont(size=18), text_color=("gray45", "gray55"),
+        ).grid(row=1, column=1, padx=3, pady=3)
+        self._build_btn_tile(cross, "○", "1", r=1, c=2, w=W, h=H)
+        self._build_btn_tile(cross, "×", "0", r=2, c=1, w=W, h=H)
+
+    def _build_center_cluster(self, parent: ctk.CTkFrame) -> None:
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        frame.grid(row=0, column=1, padx=4, pady=4, sticky="n")
+        ctk.CTkLabel(
+            frame, text="Central",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=("gray55", "gray55"),
+        ).pack(pady=(4, 2))
+        grid = ctk.CTkFrame(frame, fg_color="transparent")
+        grid.pack()
+        W, H = 88, 50
+        self._build_btn_tile(grid, "◁▷", "8",  r=0, c=0, w=W, h=H)
+        self._build_btn_tile(grid, "☰",  "9",  r=0, c=1, w=W, h=H)
+        self._build_btn_tile(grid, "L3", "10", r=1, c=0, w=W, h=H)
+        self._build_btn_tile(grid, "R3", "11", r=1, c=1, w=W, h=H)
         ctk.CTkSwitch(
-            hdr, text="Ativar analógico como mouse",
+            frame,
+            text="Analógico → Mouse",
             variable=self._analog_enabled_var,
             command=self._on_analog_toggle,
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).pack(side="left", padx=4)
+            font=ctk.CTkFont(size=11),
+        ).pack(pady=(10, 4))
 
-        # Painéis dos dois analógicos
-        self._left_stick_frame  = ctk.CTkFrame(tab)
-        self._right_stick_frame = ctk.CTkFrame(tab)
-        self._left_stick_frame.grid(row=1,  column=0, sticky="nsew", padx=(0, 4), pady=(0, 4))
-        self._right_stick_frame.grid(row=1, column=1, sticky="nsew", padx=(4, 0), pady=(0, 4))
+    def _build_btn_tile(
+        self, parent: ctk.CTkFrame, label: str, btn_key: str,
+        r: int, c: int, w: int = 88, h: int = 54,
+    ) -> ctk.CTkButton:
+        """Cria um tile clicável para um botão físico do controle."""
+        btn = ctk.CTkButton(
+            parent,
+            text=f"{label}\n{self._btn_tile_text(btn_key)}",
+            width=w, height=h,
+            fg_color=("gray68", "gray28"),
+            hover_color=("gray58", "gray38"),
+            font=ctk.CTkFont(size=11),
+            command=lambda k=btn_key: self._on_btn_tile_click(k),
+        )
+        btn.grid(row=r, column=c, padx=3, pady=3)
+        self._btn_tiles[btn_key] = btn
+        return btn
+
+    def _btn_tile_text(self, btn_key: str) -> str:
+        """Retorna texto resumido da binding atual para exibir no tile."""
+        bind = self.cfg["binds"].get(btn_key)
+        if not bind:
+            return "—"
+        t = bind.get("type", "none")
+        if t == "keyboard":
+            return f'\u2328 {bind.get("key", "")}'
+        if t == "sequence":
+            n = len(bind.get("steps", []))
+            return f'\u25b6 {n} passo{"s" if n != 1 else ""}'
+        if t == "mouse_combo":
+            return "\U0001f5b1 mouse"
+        return "—"
+
+    def _on_btn_tile_click(self, btn_key: str) -> None:
+        existing = self.cfg["binds"].get(btn_key)
+        dlg = BindDialog(
+            self.root,
+            title=f"Configurar — Botão {btn_key}",
+            edit_key=btn_key,
+            edit_bind=existing,
+            existing_keys=[k for k in self.cfg["binds"] if k != btn_key],
+        )
+        self.root.wait_window(dlg.dialog)
+        if dlg.result:
+            old_key = btn_key
+            new_key = dlg.result["button"]
+            if old_key in self.cfg["binds"]:
+                del self.cfg["binds"][old_key]
+            self.cfg["binds"][new_key] = dlg.result["bind"]
+            self._update_btn_tiles()
+            self._save_current_preset()
+
+    def _update_btn_tiles(self) -> None:
+        """Atualiza o texto de todos os tiles com as bindings atuais do cfg."""
+        for key, btn in self._btn_tiles.items():
+            label = _BTN_TILE_LABELS.get(key, key)
+            btn.configure(text=f"{label}\n{self._btn_tile_text(key)}")
+        self._update_analog_btn_states()
 
     # ──────────────────────────────────────────────────────────────
     # Painel de analógico (cross pattern)
@@ -936,7 +1043,7 @@ class App:
         self.root.title(f"JoyBind — {path.stem}")
         self._settings["last_preset"] = str(path)
         presets.save_settings(self._settings)
-        self._render_bind_list()
+        self._update_btn_tiles()
         self._render_analog_config()
 
     def _new_preset(self) -> None:
@@ -960,7 +1067,7 @@ class App:
             presets.save_settings(self._settings)
             self._refresh_preset_dropdown()
             self.root.title(f"JoyBind — {safe}")
-            self._render_bind_list()
+            self._update_btn_tiles()
             self._render_analog_config()
 
     def _change_presets_folder(self) -> None:
@@ -1080,118 +1187,7 @@ class App:
 
         threading.Thread(target=run, daemon=True, name=f"Action-BTN{button}").start()
 
-    # ──────────────────────────────────────────────────────────────
-    # Lista de binds (Tab Botões)
-    # ──────────────────────────────────────────────────────────────
-
-    def _render_bind_list(self) -> None:
-        for widget in self._bind_scroll.winfo_children():
-            widget.destroy()
-        self._bind_rows.clear()
-        self._selected_btn_key = None
-        self._update_row_buttons()
-
-        binds = self.cfg["binds"]
-        if not binds:
-            ctk.CTkLabel(
-                self._bind_scroll,
-                text='Nenhum mapeamento configurado.\nClique em "+ Adicionar" para começar.',
-                font=ctk.CTkFont(size=12), text_color=("gray55", "gray55"), justify="center",
-            ).pack(pady=30)
-            return
-
-        for btn_key in sorted(binds, key=lambda k: int(k)):
-            self._add_bind_row(btn_key, binds[btn_key])
-
-    def _add_bind_row(self, btn_key: str, bind: dict) -> None:
-        type_label = _TYPE_LABELS.get(bind["type"], bind["type"].upper())
-        type_color = _TYPE_COLORS.get(bind["type"], "white")
-        btype = bind["type"]
-        if   btype == "keyboard": action_text = bind.get("key", "?")
-        elif btype == "sequence":
-            n = len(bind.get("steps", []))
-            action_text = f"{n} passo{'s' if n != 1 else ''}"
-        else:
-            action_text = f"X: {bind.get('x', 0)}    Y: {bind.get('y', 0)}"
-
-        row = ctk.CTkFrame(
-            self._bind_scroll, corner_radius=6,
-            fg_color=("gray88", "gray22"), cursor="hand2",
-        )
-        row.pack(fill="x", padx=4, pady=2)
-        lbl_btn = ctk.CTkLabel(row, text=f"BTN {btn_key}", width=90, anchor="w")
-        lbl_btn.pack(side="left", padx=(12, 0), pady=8)
-        lbl_type = ctk.CTkLabel(
-            row, text=type_label, width=110, anchor="w",
-            text_color=type_color, font=ctk.CTkFont(size=11, weight="bold"),
-        )
-        lbl_type.pack(side="left", pady=8)
-        lbl_action = ctk.CTkLabel(row, text=action_text, anchor="w")
-        lbl_action.pack(side="left", pady=8, fill="x", expand=True)
-
-        for widget in (row, lbl_btn, lbl_type, lbl_action):
-            widget.bind("<Button-1>",        lambda e, k=btn_key: self._select_row(k))
-            widget.bind("<Double-Button-1>", lambda e, k=btn_key: self._open_edit_dialog(k))
-        self._bind_rows.append({"key": btn_key, "frame": row})
-
-    def _select_row(self, btn_key: str) -> None:
-        _N = ("gray88", "gray22")
-        _S = ("gray70", "gray35")
-        for row in self._bind_rows:
-            row["frame"].configure(fg_color=_S if row["key"] == btn_key else _N)
-        self._selected_btn_key = btn_key
-        self._update_row_buttons()
-
-    def _update_row_buttons(self) -> None:
-        state = "normal" if self._selected_btn_key else "disabled"
-        self._edit_btn.configure(state=state)
-        self._del_btn.configure(state=state)
-
-    # ──────────────────────────────────────────────────────────────
-    # Diálogos CRUD de binds
-    # ──────────────────────────────────────────────────────────────
-
-    def _open_add_dialog(self) -> None:
-        dlg = BindDialog(
-            self.root, title="Novo Mapeamento",
-            existing_keys=list(self.cfg["binds"].keys()),
-        )
-        self.root.wait_window(dlg.dialog)
-        if dlg.result:
-            self.cfg["binds"][dlg.result["button"]] = dlg.result["bind"]
-            self._save_current_preset()
-            self._render_bind_list()
-
-    def _open_edit_dialog(self, force_key: str | None = None) -> None:
-        key  = force_key or self._selected_btn_key
-        bind = self.cfg["binds"].get(key) if key else None
-        if not key or not bind:
-            return
-        dlg = BindDialog(
-            self.root, title="Editar Mapeamento",
-            edit_key=key, edit_bind=bind,
-            existing_keys=list(self.cfg["binds"].keys()),
-        )
-        self.root.wait_window(dlg.dialog)
-        if dlg.result:
-            if key in self.cfg["binds"]:
-                del self.cfg["binds"][key]
-            self.cfg["binds"][dlg.result["button"]] = dlg.result["bind"]
-            self._save_current_preset()
-            self._render_bind_list()
-
-    def _delete_selected(self) -> None:
-        if not self._selected_btn_key:
-            return
-        if messagebox.askyesno(
-            "Confirmar remoção",
-            f"Remover o mapeamento do BTN {self._selected_btn_key}?",
-            parent=self.root,
-        ):
-            del self.cfg["binds"][self._selected_btn_key]
-            self._save_current_preset()
-            self._selected_btn_key = None
-            self._render_bind_list()
+    # (lista de binds e CRUD removidos — substituídos pelos tiles do layout visual)
 
     # ──────────────────────────────────────────────────────────────
     # Encerramento
