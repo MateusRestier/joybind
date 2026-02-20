@@ -1,65 +1,103 @@
 """
-actions.py — Execução das ações mapeadas: tecla de teclado e combo de mouse.
+actions.py — Execução das ações mapeadas.
 
-Todas as funções são thread-safe para chamada a partir da thread do controller.
+Funções thread-safe chamáveis a partir da thread do controller ou de workers.
 """
+import time
 import pyautogui
 
-# Remove o delay padrão de 0.1 s que o pyautogui insere entre cada ação.
-# Isso é fundamental para que o combo de mouse seja instantâneo.
+# Remove o delay padrão de 0.1 s entre cada chamada pyautogui.
 pyautogui.PAUSE = 0
-
-# FailSafe: mover o mouse para o canto superior-esquerdo (0, 0) levanta
-# FailSafeException. Mantemos True durante o desenvolvimento; se for
-# indesejável, mude para False — mas perca o safety net.
 pyautogui.FAILSAFE = True
 
 
-def execute_keyboard(key: str) -> None:
-    """
-    Simula o pressionamento e soltura de uma tecla.
+# ── Ações simples ─────────────────────────────────────────────────────────────
 
-    :param key: Nome da tecla no formato pyautogui.
-                Exemplos: 'enter', 'space', 'esc', 'f5', 'a', 'ctrl', 'shift'.
-                Lista completa: pyautogui.KEYBOARD_KEYS
-    """
+def execute_keyboard(key: str) -> None:
+    """Pressiona e solta uma tecla. Ex: 'enter', 'space', 'f5', 'ctrl'."""
     try:
         pyautogui.press(key)
     except pyautogui.FailSafeException:
-        pass  # Mouse no canto: ignorar silenciosamente
+        pass
     except Exception as e:
         print(f"[Actions] Erro ao pressionar tecla '{key}': {e}")
 
 
 def execute_mouse_combo(x: int, y: int) -> None:
     """
-    Executa o combo de mouse em 4 passos atômicos e instantâneos:
-
-      1. Captura a posição atual do cursor.
-      2. Teleporta o cursor para a coordenada alvo (x, y).
-      3. Executa um clique com o botão esquerdo.
-      4. Retorna o cursor para a posição capturada no passo 1.
-
-    Com pyautogui.PAUSE = 0 e duration=0, a operação inteira é
-    executada em microssegundos — imperceptível para o usuário.
-
-    :param x: Coordenada X do ponto de clique na tela.
-    :param y: Coordenada Y do ponto de clique na tela.
+    Compatibilidade retroativa com o tipo mouse_combo antigo.
+    Equivale a: save_mouse → move_mouse(x,y) → click_left → restore_mouse.
     """
-    try:
-        # Passo 1 — Salva posição original
-        origin = pyautogui.position()
+    execute_sequence([
+        {"action": "save_mouse"},
+        {"action": "move_mouse", "x": x, "y": y},
+        {"action": "click_left"},
+        {"action": "restore_mouse"},
+    ])
 
-        # Passo 2 — Teleporta para o alvo (duration=0 = sem animação)
-        pyautogui.moveTo(x, y, duration=0)
 
-        # Passo 3 — Clique esquerdo
-        pyautogui.click()
+# ── Sequência de ações (timeline) ─────────────────────────────────────────────
 
-        # Passo 4 — Retorna à posição original
-        pyautogui.moveTo(origin.x, origin.y, duration=0)
+def execute_sequence(steps: list[dict]) -> None:
+    """
+    Executa uma lista ordenada de passos.
 
-    except pyautogui.FailSafeException:
-        pass  # Mouse estava no canto: aborta o combo silenciosamente
-    except Exception as e:
-        print(f"[Actions] Erro no combo de mouse ({x}, {y}): {e}")
+    Passos suportados:
+      save_mouse    — Salva a posição atual do cursor em variável local.
+      restore_mouse — Restaura o cursor para a posição salva.
+      move_mouse    — Teleporta o cursor para {"x": int, "y": int}.
+      click_left    — Clique esquerdo na posição atual.
+      click_right   — Clique direito na posição atual.
+      click_middle  — Clique do meio na posição atual.
+      double_click  — Clique duplo esquerdo na posição atual.
+      scroll_up     — Rola para cima {"clicks": int} vezes (padrão 3).
+      scroll_down   — Rola para baixo {"clicks": int} vezes (padrão 3).
+      key           — Pressiona uma tecla {"key": str}.
+      delay         — Pausa {"ms": int} milissegundos (padrão 100).
+    """
+    saved_pos = None  # Posição salva pelo passo save_mouse
+
+    for step in steps:
+        action = step.get("action", "")
+        try:
+            if action == "save_mouse":
+                saved_pos = pyautogui.position()
+
+            elif action == "restore_mouse":
+                if saved_pos is not None:
+                    pyautogui.moveTo(saved_pos.x, saved_pos.y, duration=0)
+
+            elif action == "move_mouse":
+                pyautogui.moveTo(step["x"], step["y"], duration=0)
+
+            elif action == "click_left":
+                pyautogui.click(button="left")
+
+            elif action == "click_right":
+                pyautogui.click(button="right")
+
+            elif action == "click_middle":
+                pyautogui.click(button="middle")
+
+            elif action == "double_click":
+                pyautogui.doubleClick()
+
+            elif action == "scroll_up":
+                pyautogui.scroll(step.get("clicks", 3))
+
+            elif action == "scroll_down":
+                pyautogui.scroll(-step.get("clicks", 3))
+
+            elif action == "key":
+                pyautogui.press(step["key"])
+
+            elif action == "delay":
+                time.sleep(step.get("ms", 100) / 1000.0)
+
+            else:
+                print(f"[Actions] Ação desconhecida ignorada: '{action}'")
+
+        except pyautogui.FailSafeException:
+            return  # Aborta a sequência inteira silenciosamente
+        except Exception as e:
+            print(f"[Actions] Erro no passo '{action}': {e}")

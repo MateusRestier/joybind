@@ -43,12 +43,14 @@ _COLOR_BTN_STOP_HOVER = "#d35400"
 
 # Rótulos exibidos na lista para cada tipo de bind
 _TYPE_LABELS: dict[str, str] = {
-    "keyboard": "TECLADO",
-    "mouse_combo": "MOUSE",
+    "keyboard":   "TECLADO",
+    "sequence":   "SEQUÊNCIA",
+    "mouse_combo": "MOUSE",   # legado
 }
 _TYPE_COLORS: dict[str, str] = {
-    "keyboard": "#3498db",
-    "mouse_combo": "#9b59b6",
+    "keyboard":   "#3498db",
+    "sequence":   "#e67e22",
+    "mouse_combo": "#9b59b6",  # legado
 }
 
 
@@ -315,10 +317,15 @@ class App:
 
         # Executa ação em thread própria (pyautogui pode bloquear)
         def run() -> None:
-            if bind["type"] == "keyboard":
+            btype = bind["type"]
+            if btype == "keyboard":
                 actions.execute_keyboard(bind["key"])
                 label_text = f"BTN {button}  →  {bind['key']}"
-            elif bind["type"] == "mouse_combo":
+            elif btype == "sequence":
+                n = len(bind.get("steps", []))
+                actions.execute_sequence(bind["steps"])
+                label_text = f"BTN {button}  →  sequência ({n} passo{'s' if n != 1 else ''})"
+            elif btype == "mouse_combo":  # compatibilidade com configs antigas
                 actions.execute_mouse_combo(bind["x"], bind["y"])
                 label_text = f"BTN {button}  →  mouse ({bind['x']}, {bind['y']})"
             else:
@@ -359,9 +366,14 @@ class App:
         type_label = _TYPE_LABELS.get(bind["type"], bind["type"].upper())
         type_color = _TYPE_COLORS.get(bind["type"], "white")
 
-        if bind["type"] == "keyboard":
+        btype = bind["type"]
+        if btype == "keyboard":
             action_text = bind.get("key", "?")
-        else:
+        elif btype == "sequence":
+            steps = bind.get("steps", [])
+            n = len(steps)
+            action_text = f"{n} passo{'s' if n != 1 else ''}"
+        else:  # mouse_combo legado
             action_text = f"X: {bind.get('x', 0)}    Y: {bind.get('y', 0)}"
 
         row = ctk.CTkFrame(
