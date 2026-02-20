@@ -732,3 +732,278 @@ class BindDialog:
 
         self.result = {"button": btn_key, "bind": bind_data}
         self.dialog.destroy()
+
+
+# ── Editor de sequência standalone (sem seleção de botão) ────────────────────
+
+class SequenceDialog:
+    """
+    Diálogo modal contendo apenas o editor de timeline de ações.
+    Usado pelo AnalogDirectionDialog para configurar sequências nas direções.
+
+    Attributes:
+        result (list[dict] | None): Lista de passos ao confirmar. None se cancelado.
+        dialog (CTkToplevel): A janela do diálogo.
+    """
+
+    def __init__(self, parent, current_steps: list[dict] | None = None) -> None:
+        self.result: list[dict] | None = None
+        self._seq_steps: list[dict] = []
+
+        self.dialog = ctk.CTkToplevel(parent)
+        self.dialog.title("Sequência de Ações")
+        self.dialog.geometry("530x460")
+        self.dialog.resizable(False, True)
+        self.dialog.minsize(530, 340)
+        self.dialog.grab_set()
+        self.dialog.lift()
+        self.dialog.focus_force()
+        self.dialog.grid_columnconfigure(0, weight=1)
+        self.dialog.grid_rowconfigure(0, weight=1)
+        self.dialog.protocol("WM_DELETE_WINDOW", self.dialog.destroy)
+
+        # ── Área principal ────────────────────────────────────────
+        content = ctk.CTkFrame(self.dialog, fg_color="transparent")
+        content.grid(row=0, column=0, sticky="nsew", padx=12, pady=(12, 4))
+        content.grid_columnconfigure(0, weight=1)
+        content.grid_rowconfigure(0, weight=1)
+
+        self._seq_scroll = ctk.CTkScrollableFrame(
+            content,
+            label_text="Linha do Tempo",
+            label_font=ctk.CTkFont(size=12, weight="bold"),
+        )
+        self._seq_scroll.grid(row=0, column=0, sticky="nsew", pady=(0, 6))
+        self._seq_scroll.grid_columnconfigure(0, weight=1)
+
+        self._seq_empty_label = ctk.CTkLabel(
+            self._seq_scroll,
+            text="Nenhuma ação ainda.\nUse o menu abaixo para adicionar passos.",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray55", "gray55"),
+            justify="center",
+        )
+        self._seq_empty_label.pack(pady=30)
+
+        add_bar = ctk.CTkFrame(content, fg_color="transparent")
+        add_bar.grid(row=1, column=0, sticky="ew", pady=(0, 4))
+        self._new_action_var = ctk.StringVar(value=_STEP_LABELS[0])
+        ctk.CTkOptionMenu(
+            add_bar, variable=self._new_action_var,
+            values=_STEP_LABELS, width=260,
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            add_bar, text="+ Adicionar Passo", width=140,
+            command=self._add_step,
+        ).pack(side="left")
+
+        # ── Separador + botões ────────────────────────────────────
+        ctk.CTkFrame(self.dialog, height=1, fg_color=("gray70", "gray35")).grid(
+            row=1, column=0, sticky="ew", padx=12, pady=(4, 4),
+        )
+        btn_row = ctk.CTkFrame(self.dialog, fg_color="transparent")
+        btn_row.grid(row=2, column=0, sticky="ew", padx=12, pady=(4, 12))
+        ctk.CTkButton(
+            btn_row, text="Cancelar", width=100,
+            fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
+            command=self.dialog.destroy,
+        ).pack(side="right", padx=(6, 0))
+        ctk.CTkButton(btn_row, text="OK", width=100, command=self._on_ok).pack(side="right")
+
+        for step in (current_steps or []):
+            self._render_step(step)
+
+    # ── Gestão de passos ──────────────────────────────────────────
+
+    def _add_step(self) -> None:
+        action = _LABEL_TO_ACTION.get(self._new_action_var.get(), "click_left")
+        self._render_step({"action": action})
+
+    def _render_step(self, step_data: dict) -> None:
+        idx = len(self._seq_steps)
+        row = ctk.CTkFrame(self._seq_scroll, corner_radius=6, fg_color=("gray85", "gray23"))
+        row.pack(fill="x", padx=4, pady=3)
+        row.grid_columnconfigure(1, weight=1)
+
+        num_lbl = ctk.CTkLabel(
+            row, text=str(idx + 1), width=22,
+            font=ctk.CTkFont(size=10, weight="bold"),
+            text_color=("gray50", "gray50"),
+        )
+        num_lbl.grid(row=0, column=0, padx=(8, 2), pady=(7, 2), sticky="n")
+
+        action = step_data.get("action", "click_left")
+        action_var = ctk.StringVar(value=_STEP_ACTION_LABELS.get(action, action))
+        param_frame = ctk.CTkFrame(row, fg_color="transparent")
+        param_frame.grid(row=1, column=0, columnspan=3, sticky="ew", padx=(34, 8), pady=(0, 7))
+        widgets: dict = {}
+        self._render_step_params(param_frame, action, step_data, widgets)
+
+        entry = {
+            "row": row, "num_lbl": num_lbl,
+            "action_var": action_var, "param_frame": param_frame, "widgets": widgets,
+        }
+
+        def on_action_change(label: str, e: dict = entry) -> None:
+            new_action = _LABEL_TO_ACTION.get(label, "click_left")
+            self._render_step_params(e["param_frame"], new_action, {}, e["widgets"])
+
+        ctk.CTkOptionMenu(
+            row, variable=action_var, values=_STEP_LABELS,
+            command=on_action_change,
+        ).grid(row=0, column=1, sticky="ew", padx=(2, 6), pady=(7, 2))
+
+        ctrl = ctk.CTkFrame(row, fg_color="transparent")
+        ctrl.grid(row=0, column=2, padx=(0, 8), pady=(7, 2))
+        ctk.CTkButton(ctrl, text="↑", width=28, height=26,
+            fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
+            command=lambda e=entry: self._move_step(e, -1)).pack(side="left", padx=1)
+        ctk.CTkButton(ctrl, text="↓", width=28, height=26,
+            fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
+            command=lambda e=entry: self._move_step(e, +1)).pack(side="left", padx=1)
+        ctk.CTkButton(ctrl, text="✕", width=28, height=26,
+            fg_color="#c0392b", hover_color="#a93226",
+            command=lambda e=entry: self._remove_step(e)).pack(side="left", padx=(3, 0))
+
+        self._seq_steps.append(entry)
+        self._update_empty()
+
+    def _render_step_params(self, parent, action, step_data, widgets) -> None:
+        for w in parent.winfo_children():
+            w.destroy()
+        widgets.clear()
+
+        if action == "move_mouse":
+            ctk.CTkLabel(parent, text="X:").pack(side="left", padx=(0, 4))
+            x_e = ctk.CTkEntry(parent, width=80, placeholder_text="0")
+            if "x" in step_data:
+                x_e.insert(0, str(step_data["x"]))
+            x_e.pack(side="left", padx=(0, 16))
+            widgets["x"] = x_e
+            ctk.CTkLabel(parent, text="Y:").pack(side="left", padx=(0, 4))
+            y_e = ctk.CTkEntry(parent, width=80, placeholder_text="0")
+            if "y" in step_data:
+                y_e.insert(0, str(step_data["y"]))
+            y_e.pack(side="left", padx=(0, 16))
+            widgets["y"] = y_e
+            cap = ctk.CTkButton(parent, text="📍 Capturar", width=110,
+                fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"))
+            cap.configure(command=lambda b=cap: self._capture_pos(
+                widgets["x"], widgets["y"], b))
+            cap.pack(side="left", padx=(0, 20))
+            save_var = ctk.BooleanVar(value=bool(step_data.get("save_restore", False)))
+            ctk.CTkCheckBox(parent, text="Salvar e restaurar posição do mouse",
+                variable=save_var, height=20).pack(side="left")
+            widgets["save_restore"] = save_var
+
+        elif action == "key":
+            e = ctk.CTkEntry(parent, width=110, placeholder_text="enter")
+            if "key" in step_data:
+                e.insert(0, step_data["key"])
+            e.pack(side="left", padx=(0, 4))
+            widgets["key"] = e
+            cap = ctk.CTkButton(parent, text="Capturar", width=80,
+                fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"))
+            cap.configure(command=lambda en=e, b=cap: self._capture_key(en, b))
+            cap.pack(side="left", padx=2)
+
+        elif action == "delay":
+            e = ctk.CTkEntry(parent, width=70, placeholder_text="100")
+            if "ms" in step_data:
+                e.insert(0, str(step_data["ms"]))
+            e.pack(side="left", padx=(0, 4))
+            ctk.CTkLabel(parent, text="ms").pack(side="left")
+            widgets["ms"] = e
+
+        elif action in ("scroll_up", "scroll_down"):
+            ctk.CTkLabel(parent, text="Cliques:").pack(side="left", padx=(0, 4))
+            e = ctk.CTkEntry(parent, width=50, placeholder_text="3")
+            if "clicks" in step_data:
+                e.insert(0, str(step_data["clicks"]))
+            e.pack(side="left")
+            widgets["clicks"] = e
+
+    def _extract_step(self, entry: dict) -> dict:
+        action = _LABEL_TO_ACTION.get(entry["action_var"].get(), "click_left")
+        step: dict = {"action": action}
+        w = entry["widgets"]
+        if action == "move_mouse":
+            try:    step["x"] = int(w["x"].get() or 0)
+            except ValueError: step["x"] = 0
+            try:    step["y"] = int(w["y"].get() or 0)
+            except ValueError: step["y"] = 0
+            step["save_restore"] = bool(w.get("save_restore") and w["save_restore"].get())
+        elif action == "key":
+            step["key"] = w["key"].get().strip() or "enter"
+        elif action == "delay":
+            try:    step["ms"] = int(w["ms"].get() or 100)
+            except ValueError: step["ms"] = 100
+        elif action in ("scroll_up", "scroll_down"):
+            try:    step["clicks"] = int(w["clicks"].get() or 3)
+            except ValueError: step["clicks"] = 3
+        return step
+
+    def _move_step(self, entry: dict, direction: int) -> None:
+        idx = self._seq_steps.index(entry)
+        new_idx = idx + direction
+        if 0 <= new_idx < len(self._seq_steps):
+            data = [self._extract_step(e) for e in self._seq_steps]
+            data[idx], data[new_idx] = data[new_idx], data[idx]
+            self._rebuild(data)
+
+    def _remove_step(self, entry: dict) -> None:
+        data = [self._extract_step(e) for e in self._seq_steps if e is not entry]
+        self._rebuild(data)
+
+    def _rebuild(self, data: list[dict]) -> None:
+        for e in self._seq_steps:
+            e["row"].destroy()
+        self._seq_steps.clear()
+        for step_data in data:
+            self._render_step(step_data)
+        self._update_empty()
+
+    def _update_empty(self) -> None:
+        if self._seq_steps:
+            self._seq_empty_label.pack_forget()
+        else:
+            self._seq_empty_label.pack(pady=30)
+
+    def _capture_key(self, entry: ctk.CTkEntry, btn: ctk.CTkButton) -> None:
+        try:
+            from pynput import keyboard as pynput_kb
+        except ImportError:
+            return
+        btn.configure(text="Pressione...", state="disabled")
+        entry.delete(0, "end")
+
+        def on_press(key):
+            key_name = _normalize_key(key)
+            self.dialog.after(0, lambda: (
+                entry.delete(0, "end"),
+                entry.insert(0, key_name),
+                btn.configure(text="Capturar", state="normal"),
+            ))
+            return False
+
+        lst = pynput_kb.Listener(on_press=on_press, suppress=False)
+        lst.daemon = True
+        lst.start()
+
+    def _capture_pos(self, x_e: ctk.CTkEntry, y_e: ctk.CTkEntry, btn: ctk.CTkButton) -> None:
+        btn.configure(state="disabled")
+        self._pos_countdown(3, x_e, y_e, btn)
+
+    def _pos_countdown(self, n: int, x_e, y_e, btn) -> None:
+        if n > 0:
+            btn.configure(text=f"{n}s...")
+            self.dialog.after(1000, lambda: self._pos_countdown(n - 1, x_e, y_e, btn))
+        else:
+            pos = pyautogui.position()
+            x_e.delete(0, "end"); x_e.insert(0, str(pos.x))
+            y_e.delete(0, "end"); y_e.insert(0, str(pos.y))
+            btn.configure(text="📍", state="normal")
+
+    def _on_ok(self) -> None:
+        self.result = [self._extract_step(e) for e in self._seq_steps]
+        self.dialog.destroy()
