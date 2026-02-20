@@ -99,6 +99,10 @@ def _sanitize_filename(name: str) -> str:
 # Sensibilidade de scroll (cliques/s) usada pelo analógico direito no modo mouse
 _SCROLL_SENS_MOUSE_MODE: float = 8.0
 
+# Intervalo de frames entre pressões repetidas de tecla no modo analógico
+# (60 Hz / 4 = ~15 pressionamentos/s, similar ao auto-repeat padrão do Windows)
+_KEY_REPEAT_FRAMES: int = 4
+
 
 def _find_sens(stick: dict, target_types: tuple, fallback: float = 600.0) -> float:
     """Retorna a primeira sensibilidade configurada para um dos tipos alvo."""
@@ -352,6 +356,8 @@ class App:
         # Estado anterior de ativação por direção — para edge-trigger de sequências
         # Chave: (stick_index, direction_str)
         self._prev_dir_active: dict[tuple, bool] = {}
+        # Contador de frames por direção — controla o repeat rate de teclas analógicas
+        self._key_hold_frames: dict[tuple, int] = {}
 
         # Placeholders — populados em _build_analogicos_tab
         self._analog_enabled_var:   ctk.BooleanVar | None        = None
@@ -804,7 +810,6 @@ class App:
             self._acc_x = self._acc_y = self._acc_sv = self._acc_sh = 0.0
 
         dx = dy = sv = sh = 0.0
-        new_held: set[str] = set()
         sticks = analog.get("sticks", [])
 
         if mouse_enabled:
@@ -860,8 +865,16 @@ class App:
 
                     btype = b.get("type", "none")
                     if btype == "key" and b.get("key") and is_active:
-                        new_held.add(b["key"])
-                    elif btype == "sequence" and is_active and not was_active:
+                        # Pressiona a tecla no primeiro frame e depois a cada
+                        # _KEY_REPEAT_FRAMES frames, simulando o auto-repeat do OS
+                        frame = self._key_hold_frames.get(key, 0)
+                        if frame % _KEY_REPEAT_FRAMES == 0:
+                            actions.key_combo_press(b["key"])
+                        self._key_hold_frames[key] = frame + 1
+                    else:
+                        self._key_hold_frames.pop(key, None)
+
+                    if btype == "sequence" and is_active and not was_active:
                         # Edge trigger: dispara a sequência uma única vez ao cruzar o limite
                         steps = b.get("steps", [])
                         if steps:
@@ -871,13 +884,6 @@ class App:
                                 daemon=True,
                                 name=f"SeqDir-{i}-{direction}",
                             ).start()
-
-        # Mantém/solta combos de tecla
-        for key in self._held_keys - new_held:
-            actions.key_combo_up(key)
-        for key in new_held - self._held_keys:
-            actions.key_combo_down(key)
-        self._held_keys = new_held
 
         # Sub-pixel + movimento (quando mouse_enabled; zeros caso contrário)
         self._acc_x  += dx;  ix  = int(self._acc_x);  self._acc_x  -= ix
@@ -1037,6 +1043,7 @@ class App:
         self._is_listening = False
         self._acc_x = self._acc_y = self._acc_sv = self._acc_sh = 0.0
         self._prev_dir_active = {}
+        self._key_hold_frames.clear()
         self._release_all_held_keys()
         self._toggle_btn.configure(
             text="  Iniciar Escuta",

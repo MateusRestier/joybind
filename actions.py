@@ -187,3 +187,14 @@ def key_combo_up(combo: str) -> None:
     """Solta um combo de teclas na ordem inversa."""
     for key in reversed(_parse_combo(combo)):
         key_up(key)
+
+
+def key_combo_press(combo: str) -> None:
+    """Pressiona e solta um combo de teclas de uma vez (usado para auto-repeat analógico)."""
+    parts = _parse_combo(combo)
+    try:
+        pyautogui.hotkey(*parts)
+    except pyautogui.FailSafeException:
+        pass
+    except Exception as e:
+        print(f"[Actions] Erro ao pressionar combo '{combo}': {e}")

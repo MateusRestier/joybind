@@ -100,7 +100,7 @@ class BindDialog:
         self.dialog = ctk.CTkToplevel(parent)
         self.dialog.title(title)
         self.dialog.geometry("530x520")
-        self.dialog.resizable(False, True)   # Redimensionável verticalmente
+        self.dialog.resizable(True, True)
         self.dialog.minsize(530, 420)
         self.dialog.grab_set()
         self.dialog.lift()
@@ -753,7 +753,7 @@ class SequenceDialog:
         self.dialog = ctk.CTkToplevel(parent)
         self.dialog.title("Sequência de Ações")
         self.dialog.geometry("530x460")
-        self.dialog.resizable(False, True)
+        self.dialog.resizable(True, True)
         self.dialog.minsize(530, 340)
         self.dialog.grab_set()
         self.dialog.lift()
