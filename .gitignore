@@ -13,8 +13,10 @@ build/
 venv/
 env/
 
-# Runtime — configuração gerada pelo usuário (não versionada)
+# Runtime — dados gerados pelo usuário (não versionados)
 config.json
+settings.json
+settings.tmp
 
 # IDEs
 .vscode/
