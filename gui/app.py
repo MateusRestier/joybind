@@ -60,6 +60,7 @@ def _default_sticks() -> list[dict]:
     return [
         {
             "label": "Esquerdo", "axis_x": 0, "axis_y": 1, "deadzone": 0.15,
+            "sensitivity": 600.0,
             "up":    {"type": "mouse_y", "sensitivity": 600},
             "down":  {"type": "mouse_y", "sensitivity": 600},
             "left":  {"type": "mouse_x", "sensitivity": 600},
@@ -67,6 +68,7 @@ def _default_sticks() -> list[dict]:
         },
         {
             "label": "Direito", "axis_x": 2, "axis_y": 3, "deadzone": 0.15,
+            "sensitivity": 8.0,
             "up":    {"type": "none"},
             "down":  {"type": "none"},
             "left":  {"type": "none"},
@@ -420,8 +422,9 @@ class App:
         if "axes" in analog:
             del analog["axes"]
         analog.setdefault("sticks", _default_sticks())
-        for stick in analog["sticks"]:
+        for i, stick in enumerate(analog["sticks"]):
             stick.setdefault("deadzone", 0.15)
+            stick.setdefault("sensitivity", 600.0 if i == 0 else 8.0)
             for d in ("up", "down", "left", "right"):
                 stick.setdefault(d, {"type": "none"})
         return cfg
@@ -726,6 +729,17 @@ class App:
         dz_entry.insert(0, str(stick_cfg.get("deadzone", 0.15)))
         dz_entry.pack(side="left")
 
+        default_sens = 600.0 if stick_idx == 0 else 8.0
+        sens_unit    = "px/s" if stick_idx == 0 else "cl/s"
+        ctk.CTkLabel(ax_frame, text="Sens.:", font=ctk.CTkFont(size=11)).pack(side="left", padx=(8, 2))
+        sens_entry = ctk.CTkEntry(ax_frame, width=52, justify="center")
+        sens_entry.insert(0, str(stick_cfg.get("sensitivity", default_sens)))
+        sens_entry.pack(side="left")
+        ctk.CTkLabel(
+            ax_frame, text=sens_unit, font=ctk.CTkFont(size=10),
+            text_color=("gray50", "gray55"),
+        ).pack(side="left", padx=(2, 0))
+
         # Cross pattern: ↑ ← ⊙ → ↓
         cross = ctk.CTkFrame(parent, fg_color="transparent")
         cross.pack(pady=(12, 4), expand=True)
@@ -769,7 +783,7 @@ class App:
         ).pack(pady=(0, 8))
 
         # Auto-save nas entries de eixo
-        for entry in (axis_x_entry, axis_y_entry, dz_entry):
+        for entry in (axis_x_entry, axis_y_entry, dz_entry, sens_entry):
             entry.bind("<FocusOut>", lambda e: self._save_analog_config())
             entry.bind("<Return>",   lambda e: self._save_analog_config())
 
@@ -777,6 +791,7 @@ class App:
             "axis_x_entry": axis_x_entry,
             "axis_y_entry": axis_y_entry,
             "dz_entry":     dz_entry,
+            "sens_entry":   sens_entry,
             "dir_btns":     dir_btns,
             "dir_bindings": dir_bindings,
         }
@@ -857,11 +872,17 @@ class App:
                 dz = max(0.0, min(0.99, float(panel["dz_entry"].get())))
             except (ValueError, TypeError):
                 dz = 0.15
+            default_sens = 600.0 if i == 0 else 8.0
+            try:
+                sens = max(0.1, float(panel["sens_entry"].get()))
+            except (ValueError, TypeError):
+                sens = default_sens
             sticks.append({
-                "label":    labels[i] if i < len(labels) else f"Analógico {i+1}",
-                "axis_x":   ax,
-                "axis_y":   ay,
-                "deadzone": dz,
+                "label":       labels[i] if i < len(labels) else f"Analógico {i+1}",
+                "axis_x":      ax,
+                "axis_y":      ay,
+                "deadzone":    dz,
+                "sensitivity": sens,
                 **panel["dir_bindings"],
             })
         return {
@@ -935,13 +956,15 @@ class App:
 
                 if i == 0:
                     # Analógico esquerdo → mouse
-                    dx += sx * _find_sens(stick, ("mouse_x",)) / 60.0
-                    dy += sy * _find_sens(stick, ("mouse_y",)) / 60.0
+                    sens = float(stick.get("sensitivity", 600.0))
+                    dx += sx * sens / 60.0
+                    dy += sy * sens / 60.0
                 elif i == 1:
                     # Analógico direito → scroll
                     # sy < 0 = stick p/ cima → scroll up (positivo em pyautogui)
-                    sv -= sy * _SCROLL_SENS_MOUSE_MODE / 60.0
-                    sh += sx * _SCROLL_SENS_MOUSE_MODE / 60.0
+                    sens = float(stick.get("sensitivity", 8.0))
+                    sv -= sy * sens / 60.0
+                    sh += sx * sens / 60.0
             # new_held fica vazio → teclas eventualmente presas serão soltas
 
         else:
