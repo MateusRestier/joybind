@@ -116,3 +116,74 @@ def execute_sequence(steps: list[dict]) -> None:
             pyautogui.moveTo(saved_pos.x, saved_pos.y, duration=0)
         except Exception as e:
             print(f"[Actions] Erro ao restaurar posição: {e}")
+
+
+# ── Movimento analógico contínuo ───────────────────────────────────────────
+
+def move_mouse_relative(dx: int, dy: int) -> None:
+    """Move o cursor de forma relativa (chamado continuamente pelo loop analógico)."""
+    try:
+        pyautogui.move(dx, dy)
+    except pyautogui.FailSafeException:
+        pass
+    except Exception as e:
+        print(f"[Actions] Erro ao mover mouse: {e}")
+
+
+def scroll_v_relative(clicks: int) -> None:
+    """Rola verticalmente. Positivo = cima, negativo = baixo."""
+    try:
+        pyautogui.scroll(clicks)
+    except pyautogui.FailSafeException:
+        pass
+    except Exception as e:
+        print(f"[Actions] Erro ao rolar verticalmente: {e}")
+
+
+def scroll_h_relative(clicks: int) -> None:
+    """Rola horizontalmente. Positivo = direita, negativo = esquerda."""
+    try:
+        pyautogui.hscroll(clicks)
+    except pyautogui.FailSafeException:
+        pass
+    except Exception as e:
+        print(f"[Actions] Erro ao rolar horizontalmente: {e}")
+
+
+# ── Teclas mantidas pressionadas (analógico → tecla) ───────────────────────
+
+def key_down(key: str) -> None:
+    """Mantém uma tecla pressionada enquanto o analógico está na direção."""
+    try:
+        pyautogui.keyDown(key)
+    except pyautogui.FailSafeException:
+        pass
+    except Exception as e:
+        print(f"[Actions] Erro ao pressionar '{key}': {e}")
+
+
+def key_up(key: str) -> None:
+    """Solta uma tecla mantida por key_down."""
+    try:
+        pyautogui.keyUp(key)
+    except pyautogui.FailSafeException:
+        pass
+    except Exception as e:
+        print(f"[Actions] Erro ao soltar '{key}': {e}")
+
+
+def _parse_combo(combo: str) -> list[str]:
+    """Divide 'ctrl+shift+d' em ['ctrl', 'shift', 'd']."""
+    return [k.strip() for k in combo.split("+") if k.strip()]
+
+
+def key_combo_down(combo: str) -> None:
+    """Mantém pressionado um combo de teclas (ex: 'ctrl+d')."""
+    for key in _parse_combo(combo):
+        key_down(key)
+
+
+def key_combo_up(combo: str) -> None:
+    """Solta um combo de teclas na ordem inversa."""
+    for key in reversed(_parse_combo(combo)):
+        key_up(key)

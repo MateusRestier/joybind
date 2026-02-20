@@ -29,14 +29,21 @@ class ControllerListener:
     # Taxa de polling em Hz — 60 é mais que suficiente para input humano
     _POLL_RATE_HZ = 60
 
-    def __init__(self, on_button_press: Callable[[int], None]) -> None:
+    def __init__(
+        self,
+        on_button_press: Callable[[int], None],
+        on_axes_update: Optional[Callable[[list[float]], None]] = None,
+    ) -> None:
         """
         :param on_button_press: Chamado quando um botão é pressionado.
                                 Recebe o índice inteiro do botão.
-                                ATENÇÃO: é chamado a partir de uma thread secundária;
-                                nunca interaja diretamente com a GUI neste callback.
+        :param on_axes_update:  Chamado a cada iteração de polling com a lista de
+                                valores de todos os eixos analógicos (float -1.0..1.0).
+                                Ambos os callbacks rodam na thread daemon do controller;
+                                nunca interaja diretamente com a GUI dentro deles.
         """
         self.on_button_press = on_button_press
+        self.on_axes_update = on_axes_update
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._joystick: Optional[pygame.joystick.Joystick] = None
@@ -190,6 +197,12 @@ class ControllerListener:
                         self.on_button_press(btn)
 
                     prev_states[btn] = current
+
+                # Envia estado atual de todos os eixos analógicos
+                if self.on_axes_update is not None:
+                    n_axes = self._joystick.get_numaxes()
+                    axis_values = [self._joystick.get_axis(i) for i in range(n_axes)]
+                    self.on_axes_update(axis_values)
 
             except pygame.error as exc:
                 print(f"[Controller] Erro pygame no loop: {exc}")

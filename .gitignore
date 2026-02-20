@@ -17,6 +17,7 @@ env/
 config.json
 settings.json
 settings.tmp
+presets/
 
 # IDEs
 .vscode/
