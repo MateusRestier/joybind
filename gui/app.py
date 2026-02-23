@@ -104,9 +104,6 @@ def _sanitize_filename(name: str) -> str:
 _SCROLL_SENS_MOUSE_MODE: float = 8.0
 
 # Intervalo de frames entre pressões repetidas de tecla no modo analógico
-# (60 Hz / 4 = ~15 pressionamentos/s, similar ao auto-repeat padrão do Windows)
-_KEY_REPEAT_FRAMES: int = 4
-
 # Layout padrão: vazio — o usuário configura manualmente ou via Auto-mapear.
 _DEFAULT_LAYOUT: dict[str, str] = {}
 
@@ -567,17 +564,14 @@ class App:
         self._acc_sv: float = 0.0
         self._acc_sh: float = 0.0
         self._held_keys: set[str] = set()
-        # Estado anterior de ativação por direção — para edge-trigger de sequências
+        # Estado anterior de ativação por direção — para edge-trigger
         # Chave: (stick_index, direction_str)
         self._prev_dir_active: dict[tuple, bool] = {}
-        # Contador de frames por direção — controla o repeat rate de teclas analógicas
-        self._key_hold_frames: dict[tuple, int] = {}
 
         # Placeholders — populados em _build_controller_layout
-        self._analog_enabled_var:   ctk.BooleanVar | None        = None
-        self._left_stick_frame:     ctk.CTkFrame   | None        = None
-        self._right_stick_frame:    ctk.CTkFrame   | None        = None
-        self._stick_panels:         list[dict | None]            = [None, None]
+        self._left_stick_frame:  ctk.CTkFrame | None = None
+        self._right_stick_frame: ctk.CTkFrame | None = None
+        self._stick_panels:      list[dict | None]   = [None, None]
 
         self.listener = ControllerListener(
             on_button_press=self._on_button_press,
@@ -746,10 +740,6 @@ class App:
                     scroll._scrollbar.grid()
             scroll._parent_canvas.configure(yscrollcommand=_scrollbar_update)
 
-        # Inicializa var do toggle antes de _render_analog_config
-        analog_cfg = self.cfg.get("analog", {})
-        self._analog_enabled_var = ctk.BooleanVar(value=analog_cfg.get("enabled", False))
-
         # 0. Toolbar de ações rápidas
         toolbar = ctk.CTkFrame(scroll, fg_color="transparent")
         toolbar.pack(fill="x", padx=8, pady=(8, 0))
@@ -859,13 +849,6 @@ class App:
         self._build_btn_tile(grid, "START",  r=0, c=1, w=W, h=H)
         self._build_btn_tile(grid, "LS", r=1, c=0, w=W, h=H)
         self._build_btn_tile(grid, "RS", r=1, c=1, w=W, h=H)
-        ctk.CTkSwitch(
-            frame,
-            text="Analógico → Mouse",
-            variable=self._analog_enabled_var,
-            command=self._on_analog_toggle,
-            font=ctk.CTkFont(size=11),
-        ).pack(pady=(10, 4))
 
     def _build_btn_tile(
         self, parent: ctk.CTkFrame, visual_id: str,
@@ -887,6 +870,12 @@ class App:
         self._btn_tiles[visual_id] = btn
         return btn
 
+    _MOUSE_KEY_DISPLAY: dict[str, str] = {
+        "mouse_left":   "🖱 Esq.",
+        "mouse_right":  "🖱 Dir.",
+        "mouse_middle": "🖱 Meio",
+    }
+
     def _btn_tile_text(self, btn_key: str | None) -> str:
         """Retorna texto resumido da binding atual para exibir no tile."""
         if btn_key is None:
@@ -896,7 +885,8 @@ class App:
             return "—"
         t = bind.get("type", "none")
         if t == "keyboard":
-            return f'\u2328 {bind.get("key", "")}'
+            key = bind.get("key", "")
+            return self._MOUSE_KEY_DISPLAY.get(key, f'\u2328 {key}')
         if t == "sequence":
             n = len(bind.get("steps", []))
             return f'\u25b6 {n} passo{"s" if n != 1 else ""}'
@@ -1058,7 +1048,54 @@ class App:
         ctk.CTkLabel(
             parent, text="Clique em uma direção para configurar",
             font=ctk.CTkFont(size=10), text_color=("gray55", "gray55"),
-        ).pack(pady=(0, 8))
+        ).pack(pady=(0, 4))
+
+        # Checkboxes de modo — mutuamente exclusivos
+        # Esquerdo: "mouse" (cursor) | "game" (WASD)
+        # Direito:  "scroll"         | "game" (câmera/mouse)
+        if stick_idx == 0:
+            mode_opts = [
+                ("mouse", "🖱 Modo Mouse  (move o cursor)"),
+                ("game",  "🎮 Modo Jogo   (WASD automático)"),
+            ]
+        else:
+            mode_opts = [
+                ("scroll", "↕ Modo Scroll  (rolar página)"),
+                ("game",   "🎮 Modo Jogo   (câmera / mouse)"),
+            ]
+
+        init_mode = stick_cfg.get("stick_mode", "none")
+        stick_mode_var = ctk.StringVar(value=init_mode)
+        cb_vars: dict[str, ctk.BooleanVar] = {}
+
+        modes_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        modes_frame.pack(pady=(0, 8))
+
+        for mode_val, mode_label in mode_opts:
+            cb_var = ctk.BooleanVar(value=(init_mode == mode_val))
+
+            def _make_cmd(mv=mode_val):
+                def cmd():
+                    if stick_mode_var.get() == mv:
+                        stick_mode_var.set("none")
+                        cb_vars[mv].set(False)
+                    else:
+                        stick_mode_var.set(mv)
+                        cb_vars[mv].set(True)
+                        for other in cb_vars:
+                            if other != mv:
+                                cb_vars[other].set(False)
+                    self._on_analog_toggle()
+                return cmd
+
+            ctk.CTkCheckBox(
+                modes_frame,
+                text=mode_label,
+                variable=cb_var,
+                command=_make_cmd(mode_val),
+                font=ctk.CTkFont(size=11),
+            ).pack(anchor="w", padx=8, pady=(0, 2))
+            cb_vars[mode_val] = cb_var
 
         # Auto-save nas entries de eixo
         for entry in (axis_x_entry, axis_y_entry, dz_entry, sens_entry):
@@ -1066,12 +1103,14 @@ class App:
             entry.bind("<Return>",   lambda e: self._save_analog_config())
 
         return {
-            "axis_x_entry": axis_x_entry,
-            "axis_y_entry": axis_y_entry,
-            "dz_entry":     dz_entry,
-            "sens_entry":   sens_entry,
-            "dir_btns":     dir_btns,
-            "dir_bindings": dir_bindings,
+            "axis_x_entry":   axis_x_entry,
+            "axis_y_entry":   axis_y_entry,
+            "dz_entry":       dz_entry,
+            "sens_entry":     sens_entry,
+            "dir_btns":       dir_btns,
+            "dir_bindings":   dir_bindings,
+            "stick_mode_var": stick_mode_var,
+            "cb_vars":        cb_vars,
         }
 
     def _on_dir_btn_click(self, stick_idx: int, direction: str) -> None:
@@ -1105,28 +1144,30 @@ class App:
     # ──────────────────────────────────────────────────────────────
 
     def _on_analog_toggle(self) -> None:
-        """Chamado quando o switch de modo mouse é ativado/desativado."""
+        """Chamado quando o modo de um analógico muda."""
         self._save_analog_config()
         self._update_analog_btn_states()
 
     def _update_analog_btn_states(self) -> None:
-        """Escurece/restaura os botões de direção conforme o modo mouse."""
-        enabled = bool(self._analog_enabled_var.get()) if self._analog_enabled_var else False
+        """Escurece/desabilita botões de direção quando um modo automático está ativo."""
         for panel in self._stick_panels:
             if panel is None:
                 continue
+            dim = panel["stick_mode_var"].get() != "none" if "stick_mode_var" in panel else False
             for btn in panel["dir_btns"].values():
-                if enabled:
+                if dim:
                     btn.configure(
                         fg_color=("gray50", "gray15"),
                         hover_color=("gray50", "gray15"),
                         text_color=("gray42", "gray38"),
+                        state="disabled",
                     )
                 else:
                     btn.configure(
                         fg_color=("gray68", "gray28"),
                         hover_color=("gray58", "gray38"),
                         text_color=("gray10", "#DCE4EE"),
+                        state="normal",
                     )
 
     def _collect_analog_config(self) -> dict:
@@ -1161,12 +1202,10 @@ class App:
                 "axis_y":      ay,
                 "deadzone":    dz,
                 "sensitivity": sens,
+                "stick_mode":  panel["stick_mode_var"].get(),
                 **panel["dir_bindings"],
             })
-        return {
-            "enabled": bool(self._analog_enabled_var.get()) if self._analog_enabled_var else False,
-            "sticks":  sticks,
-        }
+        return {"sticks": sticks}
 
     def _save_analog_config(self) -> None:
         self.cfg["analog"] = self._collect_analog_config()
@@ -1174,11 +1213,10 @@ class App:
 
     def _render_analog_config(self) -> None:
         """Reconstrói os dois painéis de analógico a partir do cfg atual."""
-        if self._analog_enabled_var is None:
+        if self._left_stick_frame is None:
             return
 
         analog = self.cfg.get("analog", {})
-        self._analog_enabled_var.set(analog.get("enabled", False))
         sticks = analog.get("sticks", [])
         defs   = _default_sticks()
         frames = [self._left_stick_frame, self._right_stick_frame]
@@ -1196,94 +1234,108 @@ class App:
     # Processamento analógico — thread do controller
     # ──────────────────────────────────────────────────────────────
 
+    # WASD hardcoded para Modo Jogo do analógico esquerdo
+    _GAME_KEYS: dict[str, str] = {
+        "up": "w", "down": "s", "left": "a", "right": "d",
+    }
+
     def _on_axes_update(self, axis_values: list[float]) -> None:
         """
         Chamado a 60 Hz pela thread daemon do controller.
         Não toca em widgets — só pyautogui (thread-safe).
 
-        Modo mouse (enabled=True):
-          • Analógico esquerdo (idx 0): move o cursor (mouse_x / mouse_y).
-          • Analógico direito  (idx 1): scroll (V e H).
-          • Key bindings das direções:  ignorados.
-        Modo manual (enabled=False):
-          • Key bindings por direção: ativos.
-          • Movimento de mouse/scroll: desativado.
+        Cada stick tem um modo independente (stick_mode):
+          Esquerdo:
+            "mouse"  → move o cursor do mouse
+            "game"   → WASD (W/A/S/D mantidos/soltos por borda)
+            "none"   → key bindings manuais por direção
+          Direito:
+            "scroll" → scroll vertical/horizontal
+            "game"   → move o cursor (câmera no jogo)
+            "none"   → key bindings manuais por direção
         """
-        analog = self.cfg.get("analog", {})
-        mouse_enabled = analog.get("enabled", False)
-
-        if not mouse_enabled:
-            self._acc_x = self._acc_y = self._acc_sv = self._acc_sh = 0.0
-
+        analog  = self.cfg.get("analog", {})
+        sticks  = analog.get("sticks", [])
         dx = dy = sv = sh = 0.0
-        sticks = analog.get("sticks", [])
 
-        if mouse_enabled:
-            # Comportamento fixo por índice de stick
-            for i, stick in enumerate(sticks):
-                try:
-                    ax_idx = int(stick.get("axis_x", i * 2))
-                    ay_idx = int(stick.get("axis_y", i * 2 + 1))
-                    dz     = float(stick.get("deadzone", 0.15))
-                except (ValueError, TypeError):
-                    continue
-                if ax_idx >= len(axis_values) or ay_idx >= len(axis_values):
-                    continue
-                sx = _apply_deadzone(axis_values[ax_idx], dz)
-                sy = _apply_deadzone(axis_values[ay_idx], dz)
+        for i, stick in enumerate(sticks):
+            try:
+                ax_idx = int(stick.get("axis_x", i * 2))
+                ay_idx = int(stick.get("axis_y", i * 2 + 1))
+                dz     = float(stick.get("deadzone", 0.15))
+            except (ValueError, TypeError):
+                continue
+            if ax_idx >= len(axis_values) or ay_idx >= len(axis_values):
+                continue
 
-                if i == 0:
-                    # Analógico esquerdo → mouse
-                    sens = float(stick.get("sensitivity", 600.0))
-                    dx += sx * sens / 60.0
-                    dy += sy * sens / 60.0
-                elif i == 1:
-                    # Analógico direito → scroll
-                    # sy < 0 = stick p/ cima → scroll up (positivo em pyautogui)
-                    sens = float(stick.get("sensitivity", 8.0))
-                    sv -= sy * sens / 60.0
-                    sh += sx * sens / 60.0
-            # new_held fica vazio → teclas eventualmente presas serão soltas
+            sx = _apply_deadzone(axis_values[ax_idx], dz)
+            sy = _apply_deadzone(axis_values[ay_idx], dz)
+            mode = stick.get("stick_mode", "none")
+            sens = float(stick.get("sensitivity", 600.0))
 
-        else:
-            # Modo manual: key bindings e sequências por direção
-            for i, stick in enumerate(sticks):
-                try:
-                    ax_idx = int(stick.get("axis_x", i * 2))
-                    ay_idx = int(stick.get("axis_y", i * 2 + 1))
-                    dz     = float(stick.get("deadzone", 0.15))
-                except (ValueError, TypeError):
-                    continue
-                if ax_idx >= len(axis_values) or ay_idx >= len(axis_values):
-                    continue
-                sx = _apply_deadzone(axis_values[ax_idx], dz)
-                sy = _apply_deadzone(axis_values[ay_idx], dz)
+            if mode == "mouse":
+                # Esquerdo: move o cursor
+                dx += sx * sens / 60.0
+                dy += sy * sens / 60.0
+                self._release_stick_keys(i, stick)
 
+            elif mode == "scroll":
+                # Direito: scroll — sy negativo = cima → scroll positivo
+                sv -= sy * sens / 60.0   # scroll vertical
+                sh += sx * sens / 60.0   # scroll horizontal
+                self._release_stick_keys(i, stick)
+
+            elif mode == "game" and i == 0:
+                # Esquerdo Modo Jogo: WASD edge-triggered
                 for direction, axis_val in [
-                    ("up",    -sy),   # Y negativo = cima
-                    ("down",   sy),   # Y positivo = baixo
-                    ("left",  -sx),   # X negativo = esquerda
-                    ("right",  sx),   # X positivo = direita
+                    ("up",    -sy),
+                    ("down",   sy),
+                    ("left",  -sx),
+                    ("right",  sx),
+                ]:
+                    is_active = axis_val > 0
+                    k = (i, direction)
+                    was_active = self._prev_dir_active.get(k, False)
+                    self._prev_dir_active[k] = is_active
+                    combo = self._GAME_KEYS[direction]
+                    if is_active and not was_active:
+                        actions.key_combo_down(combo)
+                        self._held_keys.add(combo)
+                    elif not is_active and was_active:
+                        actions.key_combo_up(combo)
+                        self._held_keys.discard(combo)
+
+            elif mode == "game" and i == 1:
+                # Direito Modo Jogo: move o cursor (câmera)
+                dx += sx * sens / 60.0
+                dy += sy * sens / 60.0
+                self._release_stick_keys(i, stick)
+
+            else:
+                # Modo manual: key bindings e sequências por direção
+                for direction, axis_val in [
+                    ("up",    -sy),
+                    ("down",   sy),
+                    ("left",  -sx),
+                    ("right",  sx),
                 ]:
                     b = stick.get(direction, {"type": "none"})
                     is_active = axis_val > 0
-                    key = (i, direction)
-                    was_active = self._prev_dir_active.get(key, False)
-                    self._prev_dir_active[key] = is_active
+                    k = (i, direction)
+                    was_active = self._prev_dir_active.get(k, False)
+                    self._prev_dir_active[k] = is_active
 
                     btype = b.get("type", "none")
-                    if btype == "key" and b.get("key") and is_active:
-                        # Pressiona a tecla no primeiro frame e depois a cada
-                        # _KEY_REPEAT_FRAMES frames, simulando o auto-repeat do OS
-                        frame = self._key_hold_frames.get(key, 0)
-                        if frame % _KEY_REPEAT_FRAMES == 0:
-                            actions.key_combo_press(b["key"])
-                        self._key_hold_frames[key] = frame + 1
-                    else:
-                        self._key_hold_frames.pop(key, None)
+                    if btype == "key" and b.get("key"):
+                        combo = b["key"]
+                        if is_active and not was_active:
+                            actions.key_combo_down(combo)
+                            self._held_keys.add(combo)
+                        elif not is_active and was_active:
+                            actions.key_combo_up(combo)
+                            self._held_keys.discard(combo)
 
                     if btype == "sequence" and is_active and not was_active:
-                        # Edge trigger: dispara a sequência uma única vez ao cruzar o limite
                         steps = b.get("steps", [])
                         if steps:
                             threading.Thread(
@@ -1293,7 +1345,7 @@ class App:
                                 name=f"SeqDir-{i}-{direction}",
                             ).start()
 
-        # Sub-pixel + movimento (quando mouse_enabled; zeros caso contrário)
+        # Sub-pixel accumulation
         self._acc_x  += dx;  ix  = int(self._acc_x);  self._acc_x  -= ix
         self._acc_y  += dy;  iy  = int(self._acc_y);  self._acc_y  -= iy
         self._acc_sv += sv;  isv = int(self._acc_sv); self._acc_sv -= isv
@@ -1305,6 +1357,17 @@ class App:
             actions.scroll_v_relative(isv)
         if ish != 0:
             actions.scroll_h_relative(ish)
+
+    def _release_stick_keys(self, stick_idx: int, stick: dict) -> None:
+        """Solta quaisquer teclas presas por este stick (ao trocar de modo)."""
+        for direction in ("up", "down", "left", "right"):
+            k = (stick_idx, direction)
+            if self._prev_dir_active.get(k, False):
+                b = stick.get(direction, {"type": "none"})
+                if b.get("type") == "key" and b.get("key"):
+                    actions.key_combo_up(b["key"])
+                    self._held_keys.discard(b["key"])
+                self._prev_dir_active[k] = False
 
     def _release_all_held_keys(self) -> None:
         for key in list(self._held_keys):
@@ -1451,7 +1514,6 @@ class App:
         self._is_listening = False
         self._acc_x = self._acc_y = self._acc_sv = self._acc_sh = 0.0
         self._prev_dir_active = {}
-        self._key_hold_frames.clear()
         self._release_all_held_keys()
         self._toggle_btn.configure(
             text="  Iniciar Escuta",

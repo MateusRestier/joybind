@@ -21,6 +21,58 @@ import customtkinter as ctk
 from tkinter import messagebox
 
 
+# ── Teclas de mouse reconhecidas no painel de ação simples ───────────────────
+
+_MOUSE_KEYS: frozenset[str] = frozenset({"mouse_left", "mouse_right", "mouse_middle"})
+
+_MOUSE_BTN_NAMES: dict = {}  # preenchido após import pynput (lazy)
+
+# ── Sugestões de comandos populares ──────────────────────────────────────────
+
+_KB_SUGGESTIONS: list[tuple[str, str]] = [
+    ("— Sugestões —", ""),
+    # Cliques de mouse
+    ("🖱 Clique Esquerdo",      "mouse_left"),
+    ("🖱 Clique Direito",       "mouse_right"),
+    ("🖱 Clique do Meio",       "mouse_middle"),
+    # Teclas comuns
+    ("↵ Enter",                 "enter"),
+    ("␣ Espaço",                "space"),
+    ("⎋ Escape",                "escape"),
+    ("⇥ Tab",                   "tab"),
+    ("⌫ Backspace",             "backspace"),
+    ("⌦ Delete",                "delete"),
+    # Teclas de função
+    ("F1", "f1"),   ("F2",  "f2"),  ("F3",  "f3"),  ("F4",  "f4"),
+    ("F5", "f5"),   ("F6",  "f6"),  ("F7",  "f7"),  ("F8",  "f8"),
+    ("F9", "f9"),   ("F10", "f10"), ("F11", "f11"), ("F12", "f12"),
+    # Navegação
+    ("↑ Seta Cima",     "up"),
+    ("↓ Seta Baixo",    "down"),
+    ("← Seta Esq.",     "left"),
+    ("→ Seta Dir.",     "right"),
+    ("Page Up",         "pageup"),
+    ("Page Down",       "pagedown"),
+    ("Home",            "home"),
+    ("End",             "end"),
+    # Combos úteis
+    ("Ctrl+C — Copiar",       "ctrl+c"),
+    ("Ctrl+V — Colar",        "ctrl+v"),
+    ("Ctrl+Z — Desfazer",     "ctrl+z"),
+    ("Ctrl+S — Salvar",       "ctrl+s"),
+    ("Ctrl+A — Sel. tudo",    "ctrl+a"),
+    ("Alt+Tab — Alternar",    "alt+tab"),
+    ("Alt+F4 — Fechar",       "alt+f4"),
+    ("Win — Início",          "winleft"),
+    # Mídia
+    ("Volume +",        "volumeup"),
+    ("Volume −",        "volumedown"),
+    ("Mudo / Desmudo",  "volumemute"),
+]
+
+_SUGG_LABELS:          list[str]       = [lbl for lbl, _ in _KB_SUGGESTIONS]
+_SUGG_LABEL_TO_VALUE:  dict[str, str]  = {lbl: val for lbl, val in _KB_SUGGESTIONS}
+
 # ── Normalização de teclas pynput → pyautogui ─────────────────────────────────
 
 _PYNPUT_TO_PYAUTOGUI: dict[str, str] = {
@@ -100,9 +152,9 @@ class BindDialog:
         # ── Janela ────────────────────────────────────────────────
         self.dialog = ctk.CTkToplevel(parent)
         self.dialog.title(title)
-        self.dialog.geometry("530x520")
+        self.dialog.geometry("530x560")
         self.dialog.resizable(True, True)
-        self.dialog.minsize(530, 420)
+        self.dialog.minsize(530, 460)
         self.dialog.grab_set()
         self.dialog.lift()
         self.dialog.focus_force()
@@ -112,8 +164,8 @@ class BindDialog:
 
         self._build_ui()
 
-        if edit_key is not None and edit_bind is not None:
-            self._prefill(edit_key, edit_bind)
+        if edit_key is not None:
+            self._prefill(edit_key, edit_bind if edit_bind is not None else {})
 
         self._on_type_change()
 
@@ -156,7 +208,7 @@ class BindDialog:
 
         self._type_var = ctk.StringVar(value="keyboard")
         ctk.CTkRadioButton(
-            type_frame, text="Teclado",
+            type_frame, text="Tecla / Clique",
             variable=self._type_var, value="keyboard",
             command=self._on_type_change,
         ).pack(side="left", padx=6)
@@ -200,28 +252,57 @@ class BindDialog:
         self._kb_frame = ctk.CTkFrame(self._fields_container)
         self._kb_frame.grid_columnconfigure(1, weight=1)
 
+        # ── Linha 0: lista de sugestões ───────────────────────────
+        ctk.CTkLabel(
+            self._kb_frame, text="Sugestões:", font=ctk.CTkFont(weight="bold")
+        ).grid(row=0, column=0, padx=(12, 8), pady=(14, 6))
+
+        self._sugg_var = ctk.StringVar(value=_SUGG_LABELS[0])
+        ctk.CTkOptionMenu(
+            self._kb_frame,
+            variable=self._sugg_var,
+            values=_SUGG_LABELS,
+            command=self._on_suggestion_selected,
+            width=280,
+        ).grid(row=0, column=1, columnspan=2, sticky="w", padx=(4, 12), pady=(14, 6))
+
+        # ── Linha 1: entrada manual + capturar ───────────────────
         ctk.CTkLabel(
             self._kb_frame, text="Tecla:", font=ctk.CTkFont(weight="bold")
-        ).grid(row=0, column=0, padx=(12, 8), pady=14)
+        ).grid(row=1, column=0, padx=(12, 8), pady=(6, 14))
 
         self._key_entry = ctk.CTkEntry(
-            self._kb_frame, placeholder_text="Ex: enter, space, f5, a, ctrl ..."
+            self._kb_frame,
+            placeholder_text="Ex: enter, mouse_left, f5, ctrl+c ...",
         )
-        self._key_entry.grid(row=0, column=1, sticky="ew", padx=4, pady=14)
+        self._key_entry.grid(row=1, column=1, sticky="ew", padx=4, pady=(6, 14))
 
         self._capture_key_btn = ctk.CTkButton(
             self._kb_frame, text="Capturar", width=90,
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
             command=lambda: self._capture_key_into(self._key_entry, self._capture_key_btn),
         )
-        self._capture_key_btn.grid(row=0, column=2, padx=(4, 12), pady=14)
+        self._capture_key_btn.grid(row=1, column=2, padx=(4, 12), pady=(6, 14))
 
+        # ── Linha 2: dica de nomes válidos ────────────────────────
         ctk.CTkLabel(
             self._kb_frame,
-            text="Nomes aceitos: enter · space · tab · esc · f1-f12 · a-z · 0-9 · ctrl · alt · shift ...",
+            text=(
+                "Nomes aceitos: enter · space · escape · tab · f1-f12 · a-z · 0-9"
+                " · ctrl · alt · shift · mouse_left · mouse_right ..."
+            ),
             font=ctk.CTkFont(size=10), text_color=("gray50", "gray60"),
             wraplength=440, justify="left",
-        ).grid(row=1, column=0, columnspan=3, padx=12, pady=(0, 10), sticky="w")
+        ).grid(row=2, column=0, columnspan=3, padx=12, pady=(0, 10), sticky="w")
+
+    def _on_suggestion_selected(self, label: str) -> None:
+        """Preenche o campo de tecla com o valor da sugestão selecionada."""
+        value = _SUGG_LABEL_TO_VALUE.get(label, "")
+        if value:
+            self._key_entry.delete(0, "end")
+            self._key_entry.insert(0, value)
+        # Reseta o dropdown para o placeholder após a seleção
+        self._sugg_var.set(_SUGG_LABELS[0])
 
     # ──────────────────────────────────────────────────────────────
     # PAINEL DE SEQUÊNCIA (TIMELINE)
@@ -514,9 +595,9 @@ class BindDialog:
     # ──────────────────────────────────────────────────────────────
 
     def _capture_key_into(self, entry: ctk.CTkEntry, btn: ctk.CTkButton) -> None:
-        """Aguarda o próximo pressionamento de tecla via pynput e preenche o entry."""
+        """Aguarda o próximo pressionamento de tecla OU clique do mouse via pynput."""
         try:
-            from pynput import keyboard as pynput_kb
+            from pynput import keyboard as pynput_kb, mouse as pynput_mouse
         except ImportError:
             messagebox.showwarning(
                 "pynput ausente", "Instale pynput:\n  pip install pynput",
@@ -527,18 +608,44 @@ class BindDialog:
         btn.configure(text="Pressione...", state="disabled")
         entry.delete(0, "end")
 
-        def on_press(key):
-            key_name = _normalize_key(key)
+        captured = [False]
+        listeners: list = []
+
+        def _do_capture(value: str) -> None:
+            if captured[0]:
+                return
+            captured[0] = True
+            for lst in listeners:
+                try:
+                    lst.stop()
+                except Exception:
+                    pass
             self.dialog.after(0, lambda: (
                 entry.delete(0, "end"),
-                entry.insert(0, key_name),
+                entry.insert(0, value),
                 btn.configure(text="Capturar", state="normal"),
             ))
-            return False  # Para o listener após a primeira tecla
 
-        lst = pynput_kb.Listener(on_press=on_press, suppress=False)
-        lst.daemon = True
-        lst.start()
+        def on_key_press(key):
+            _do_capture(_normalize_key(key))
+
+        _mouse_map = {
+            pynput_mouse.Button.left:   "mouse_left",
+            pynput_mouse.Button.right:  "mouse_right",
+            pynput_mouse.Button.middle: "mouse_middle",
+        }
+
+        def on_mouse_click(x, y, button, pressed):
+            if pressed:
+                _do_capture(_mouse_map.get(button, "mouse_left"))
+
+        kb_lst    = pynput_kb.Listener(on_press=on_key_press, suppress=False)
+        mouse_lst = pynput_mouse.Listener(on_click=on_mouse_click)
+        kb_lst.daemon    = True
+        mouse_lst.daemon = True
+        listeners.extend([kb_lst, mouse_lst])
+        kb_lst.start()
+        mouse_lst.start()
 
     # ──────────────────────────────────────────────────────────────
     # CAPTURA DE POSIÇÃO DO MOUSE (genérica — usada nos steps move_mouse)
@@ -683,6 +790,8 @@ class BindDialog:
     def _prefill(self, key: str, bind: dict) -> None:
         """Popula os campos com os dados de um bind existente."""
         self._btn_entry.insert(0, key)
+        if not bind:
+            return
         bind_type = bind.get("type", "keyboard")
 
         if bind_type == "keyboard":
@@ -748,17 +857,18 @@ class BindDialog:
                     parent=self.dialog,
                 )
                 return
-            parts = [p.strip() for p in key.split("+") if p.strip()]
-            invalid = [p for p in parts if p not in pyautogui.KEYBOARD_KEYS]
-            if invalid:
-                messagebox.showerror(
-                    "Tecla inválida",
-                    f"Nome(s) de tecla não reconhecido(s): {', '.join(invalid)}\n\n"
-                    "Use o botão 'Capturar' para detectar o nome correto,\n"
-                    "ou consulte a lista de teclas válidas no README.",
-                    parent=self.dialog,
-                )
-                return
+            if key not in _MOUSE_KEYS:
+                parts = [p.strip() for p in key.split("+") if p.strip()]
+                invalid = [p for p in parts if p not in pyautogui.KEYBOARD_KEYS]
+                if invalid:
+                    messagebox.showerror(
+                        "Tecla inválida",
+                        f"Nome(s) de tecla não reconhecido(s): {', '.join(invalid)}\n\n"
+                        "Use o botão 'Capturar' para detectar o nome correto,\n"
+                        "ou consulte a lista de teclas válidas no README.",
+                        parent=self.dialog,
+                    )
+                    return
             bind_data: dict = {"type": "keyboard", "key": key}
 
         elif bind_type == "sequence":

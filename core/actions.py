@@ -14,13 +14,21 @@ pyautogui.FAILSAFE = True
 # ── Ações simples ─────────────────────────────────────────────────────────────
 
 def execute_keyboard(key: str) -> None:
-    """Pressiona e solta uma tecla. Ex: 'enter', 'space', 'f5', 'ctrl'."""
+    """Pressiona e solta uma tecla ou executa um clique de mouse.
+    Ex: 'enter', 'space', 'f5', 'ctrl', 'mouse_left', 'mouse_right'."""
     try:
-        pyautogui.press(key)
+        if key == "mouse_left":
+            pyautogui.click(button="left")
+        elif key == "mouse_right":
+            pyautogui.click(button="right")
+        elif key == "mouse_middle":
+            pyautogui.click(button="middle")
+        else:
+            pyautogui.press(key)
     except pyautogui.FailSafeException:
         pass
     except Exception as e:
-        print(f"[Actions] Erro ao pressionar tecla '{key}': {e}")
+        print(f"[Actions] Erro ao executar '{key}': {e}")
 
 
 def execute_mouse_combo(x: int, y: int) -> None:
