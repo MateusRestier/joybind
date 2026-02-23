@@ -750,19 +750,28 @@ class App:
         scroll = ctk.CTkFrame(canvas, fg_color="transparent")
         win_id = canvas.create_window((0, 0), window=scroll, anchor="nw")
 
-        def _update_scroll_region(event=None):
+        # Debounce: múltiplos eventos Configure (frame filho + canvas) são
+        # colapsados em um único update por frame, eliminando o "stretching"
+        # visual durante scroll rápido.
+        _layout_job = [None]
+
+        def _do_layout():
+            cw = canvas.winfo_width()
+            sw = scroll.winfo_reqwidth()
+            canvas.itemconfig(win_id, width=max(sw, cw))
             canvas.configure(scrollregion=canvas.bbox("all"))
-            if scroll.winfo_reqwidth() > canvas.winfo_width():
+            if sw > cw:
                 hbar.grid(row=1, column=0, sticky="ew")
             else:
                 hbar.grid_remove()
 
-        def _fit_width(event):
-            canvas.itemconfig(win_id, width=max(scroll.winfo_reqwidth(), event.width))
-            _update_scroll_region()
+        def _schedule_layout(event=None):
+            if _layout_job[0]:
+                canvas.after_cancel(_layout_job[0])
+            _layout_job[0] = canvas.after(8, _do_layout)
 
-        scroll.bind("<Configure>", _update_scroll_region)
-        canvas.bind("<Configure>", _fit_width)
+        scroll.bind("<Configure>", _schedule_layout)
+        canvas.bind("<Configure>", _schedule_layout)
 
         # Scroll de mouse só actua quando o cursor está sobre esta área
         def _wheel(ev):
