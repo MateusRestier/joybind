@@ -1,5 +1,5 @@
 """
-presets.py — Gerenciamento de presets nomeados.
+core/presets.py — Gerenciamento de presets nomeados.
 
 Cada preset é um arquivo .json independente com a estrutura:
   {"binds": {"0": {"type": "keyboard", "key": "enter"}, ...}}
@@ -11,9 +11,9 @@ O arquivo settings.json (ao lado do programa) persiste:
 import json
 from pathlib import Path
 
-_BASE_DIR = Path(__file__).parent
+_BASE_DIR = Path(__file__).parent.parent  # raiz do repositório
 
-# Pasta padrão: <dir_do_programa>/presets/
+# Pasta padrão: <raiz>/presets/
 DEFAULT_PRESETS_DIR = _BASE_DIR / "presets"
 
 # Arquivo de configurações do app (não versionado)

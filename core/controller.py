@@ -1,5 +1,5 @@
 """
-controller.py — Listener de controle rodando em thread de background via pygame.
+core/controller.py — Listener de controle rodando em thread de background via pygame.
 
 Design:
   • Não usa o sistema de eventos do pygame (pygame.event.get) porque ele tem

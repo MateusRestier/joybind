@@ -1,5 +1,5 @@
 """
-actions.py — Execução das ações mapeadas.
+core/actions.py — Execução das ações mapeadas.
 
 Funções thread-safe chamáveis a partir da thread do controller ou de workers.
 """

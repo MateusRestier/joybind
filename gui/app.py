@@ -21,10 +21,10 @@ import pygame
 import customtkinter as ctk
 from pynput.keyboard import Listener as KeyListener
 
-import presets
-import actions
-from controller import ControllerListener
-from gui.bind_dialog import BindDialog, SequenceDialog
+from core import presets
+from core import actions
+from core.controller import ControllerListener
+from .bind_dialog import BindDialog, SequenceDialog
 
 # ── Cores ──────────────────────────────────────────────────────────────────
 _COLOR_ACTIVE          = "#2ecc71"

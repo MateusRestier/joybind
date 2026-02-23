@@ -1,5 +1,5 @@
 """
-config.py — Gerenciamento do arquivo de configuração (config.json).
+core/config.py — Gerenciamento do arquivo de configuração (config.json).
 
 Estrutura do config.json:
 {
@@ -13,8 +13,8 @@ A chave de cada bind é o índice do botão como string (JSON só aceita str com
 import json
 from pathlib import Path
 
-# Arquivo salvo ao lado deste script
-CONFIG_FILE = Path(__file__).parent / "config.json"
+# Arquivo salvo na raiz do projeto
+CONFIG_FILE = Path(__file__).parent.parent / "config.json"
 
 _DEFAULT: dict = {
     "binds": {}
