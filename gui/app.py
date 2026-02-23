@@ -16,7 +16,6 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
-import tkinter as tk
 from tkinter import messagebox, filedialog
 
 import pygame
@@ -537,8 +536,8 @@ class App:
 
     def __init__(self, root: ctk.CTk) -> None:
         self.root = root
-        self.root.geometry("680x780")
-        self.root.minsize(800, 660)
+        self.root.geometry("800x860")
+        self.root.minsize(700, 780)
 
         # ── Presets ──────────────────────────────────────────────────
         self._settings = presets.load_settings()
@@ -662,47 +661,47 @@ class App:
 
     def _build_preset_bar(self) -> None:
         frame = ctk.CTkFrame(self.root)
-        frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(10, 0))
+        frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(8, 0))
         frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(frame, text="Preset:", font=ctk.CTkFont(weight="bold")).grid(
-            row=0, column=0, padx=(14, 8), pady=10,
+            row=0, column=0, padx=(14, 8), pady=7,
         )
         self._preset_var = ctk.StringVar()
         self._preset_combo = ctk.CTkComboBox(
             frame, variable=self._preset_var, state="readonly",
             command=self._on_preset_selected,
         )
-        self._preset_combo.grid(row=0, column=1, padx=4, pady=10, sticky="ew")
+        self._preset_combo.grid(row=0, column=1, padx=4, pady=7, sticky="ew")
         ctk.CTkButton(
             frame, text="Novo", width=70, command=self._new_preset,
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
-        ).grid(row=0, column=2, padx=(4, 0), pady=10)
+        ).grid(row=0, column=2, padx=(4, 0), pady=7)
         ctk.CTkButton(
             frame, text="Pasta...", width=80, command=self._change_presets_folder,
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
-        ).grid(row=0, column=3, padx=(4, 14), pady=10)
+        ).grid(row=0, column=3, padx=(4, 14), pady=7)
 
     def _build_controller_row(self) -> None:
         frame = ctk.CTkFrame(self.root)
-        frame.grid(row=2, column=0, sticky="ew", padx=12, pady=(10, 4))
+        frame.grid(row=2, column=0, sticky="ew", padx=12, pady=(6, 4))
         frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(frame, text="Controle:", font=ctk.CTkFont(weight="bold")).grid(
-            row=0, column=0, padx=(14, 8), pady=12,
+            row=0, column=0, padx=(14, 8), pady=8,
         )
         self._joystick_var = ctk.StringVar()
         self._joystick_combo = ctk.CTkComboBox(
             frame, variable=self._joystick_var, state="readonly",
         )
-        self._joystick_combo.grid(row=0, column=1, padx=4, pady=12, sticky="ew")
+        self._joystick_combo.grid(row=0, column=1, padx=4, pady=8, sticky="ew")
         self._refresh_btn = ctk.CTkButton(
             frame, text="↻", width=38, command=self._refresh_joystick_dropdown,
             fg_color=("gray70", "gray30"), hover_color=("gray60", "gray40"),
         )
-        self._refresh_btn.grid(row=0, column=2, padx=(4, 14), pady=12)
+        self._refresh_btn.grid(row=0, column=2, padx=(4, 14), pady=8)
 
     def _build_status_row(self) -> None:
         frame = ctk.CTkFrame(self.root)
-        frame.grid(row=3, column=0, sticky="ew", padx=12, pady=4)
+        frame.grid(row=3, column=0, sticky="ew", padx=12, pady=2)
         frame.grid_columnconfigure(1, weight=1)
         self._toggle_btn = ctk.CTkButton(
             frame, text="  Iniciar Escuta", width=170,
@@ -733,53 +732,19 @@ class App:
         outer.grid_columnconfigure(0, weight=1)
         outer.grid_rowconfigure(0, weight=1)
 
-        # ── Canvas com scroll vertical (sempre) + horizontal (quando necessário) ──
-        fg   = outer.cget("fg_color")
-        mode = ctk.get_appearance_mode()
-        bg   = (fg[1] if mode == "Dark" else fg[0]) if isinstance(fg, (list, tuple)) else fg
-
-        canvas = tk.Canvas(outer, highlightthickness=0, bg=bg, bd=0)
-        vbar   = ctk.CTkScrollbar(outer, orientation="vertical",   command=canvas.yview)
-        hbar   = ctk.CTkScrollbar(outer, orientation="horizontal", command=canvas.xview)
-        canvas.configure(yscrollcommand=vbar.set, xscrollcommand=hbar.set)
-
-        vbar.grid(row=0, column=1, sticky="ns")
-        canvas.grid(row=0, column=0, sticky="nsew")
-        # hbar começa oculta — aparece automaticamente quando o conteúdo é mais largo
-
-        scroll = ctk.CTkFrame(canvas, fg_color="transparent")
-        win_id = canvas.create_window((0, 0), window=scroll, anchor="nw")
-
-        # Debounce: múltiplos eventos Configure (frame filho + canvas) são
-        # colapsados em um único update por frame, eliminando o "stretching"
-        # visual durante scroll rápido.
-        _layout_job = [None]
-
-        def _do_layout():
-            cw = canvas.winfo_width()
-            sw = scroll.winfo_reqwidth()
-            canvas.itemconfig(win_id, width=max(sw, cw))
-            canvas.configure(scrollregion=canvas.bbox("all"))
-            if sw > cw:
-                hbar.grid(row=1, column=0, sticky="ew")
-            else:
-                hbar.grid_remove()
-
-        def _schedule_layout(event=None):
-            if _layout_job[0]:
-                canvas.after_cancel(_layout_job[0])
-            _layout_job[0] = canvas.after(8, _do_layout)
-
-        scroll.bind("<Configure>", _schedule_layout)
-        canvas.bind("<Configure>", _schedule_layout)
-
-        # Scroll de mouse só actua quando o cursor está sobre esta área
-        def _wheel(ev):
-            canvas.yview_scroll(int(-1 * ev.delta / 120), "units")
-        outer.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _wheel))
-        outer.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
-
+        scroll = ctk.CTkScrollableFrame(outer, fg_color="transparent")
+        scroll.grid(row=0, column=0, sticky="nsew")
         scroll.grid_columnconfigure(0, weight=1)
+
+        # Oculta a scrollbar quando todo o conteúdo cabe na área visível
+        if hasattr(scroll, "_parent_canvas") and hasattr(scroll, "_scrollbar"):
+            def _scrollbar_update(first, last):
+                scroll._scrollbar.set(first, last)
+                if float(first) <= 0.0 and float(last) >= 1.0:
+                    scroll._scrollbar.grid_remove()
+                else:
+                    scroll._scrollbar.grid()
+            scroll._parent_canvas.configure(yscrollcommand=_scrollbar_update)
 
         # Inicializa var do toggle antes de _render_analog_config
         analog_cfg = self.cfg.get("analog", {})
@@ -832,12 +797,12 @@ class App:
         row.pack(fill="x", padx=8, pady=(8, 0))
         left = ctk.CTkFrame(row, fg_color="transparent")
         left.pack(side="left")
-        self._build_btn_tile(left, "LT", r=0, c=0, w=96, h=48)
-        self._build_btn_tile(left, "LB", r=0, c=1, w=96, h=48)
+        self._build_btn_tile(left, "LT", r=0, c=0, w=96, h=42)
+        self._build_btn_tile(left, "LB", r=0, c=1, w=96, h=42)
         right = ctk.CTkFrame(row, fg_color="transparent")
         right.pack(side="right")
-        self._build_btn_tile(right, "RB", r=0, c=0, w=96, h=48)
-        self._build_btn_tile(right, "RT", r=0, c=1, w=96, h=48)
+        self._build_btn_tile(right, "RB", r=0, c=0, w=96, h=42)
+        self._build_btn_tile(right, "RT", r=0, c=1, w=96, h=42)
 
     def _build_dpad_cluster(self, parent: ctk.CTkFrame) -> None:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -849,7 +814,7 @@ class App:
         ).pack(pady=(4, 2))
         cross = ctk.CTkFrame(frame, fg_color="transparent")
         cross.pack()
-        W, H = 82, 50
+        W, H = 82, 44
         self._build_btn_tile(cross, "↑", r=0, c=1, w=W, h=H)
         self._build_btn_tile(cross, "←", r=1, c=0, w=W, h=H)
         ctk.CTkLabel(
@@ -869,7 +834,7 @@ class App:
         ).pack(pady=(4, 2))
         cross = ctk.CTkFrame(frame, fg_color="transparent")
         cross.pack()
-        W, H = 82, 50
+        W, H = 82, 44
         self._build_btn_tile(cross, "Y", r=0, c=1, w=W, h=H)
         self._build_btn_tile(cross, "X", r=1, c=0, w=W, h=H)
         ctk.CTkLabel(
@@ -889,7 +854,7 @@ class App:
         ).pack(pady=(4, 2))
         grid = ctk.CTkFrame(frame, fg_color="transparent")
         grid.pack()
-        W, H = 88, 50
+        W, H = 88, 44
         self._build_btn_tile(grid, "SELECT", r=0, c=0, w=W, h=H)
         self._build_btn_tile(grid, "START",  r=0, c=1, w=W, h=H)
         self._build_btn_tile(grid, "LS", r=1, c=0, w=W, h=H)
@@ -1062,7 +1027,7 @@ class App:
             for d in ("up", "down", "left", "right")
         }
 
-        BTN_W, BTN_H = 88, 54
+        BTN_W, BTN_H = 88, 46
         dir_btns: dict[str, ctk.CTkButton] = {}
 
         for direction, row, col in [
