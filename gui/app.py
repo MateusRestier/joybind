@@ -108,7 +108,7 @@ _KEY_REPEAT_FRAMES: int = 4
 
 # Rótulos visuais por btn_key para os tiles do layout do controle
 _BTN_TILE_LABELS: dict[str, str] = {
-    "6": "LT", "4": "LB", "5": "RB", "7": "RT",
+    "6": "L2", "4": "L1", "5": "R1", "7": "R2",
     "12": "↑",  "14": "←", "15": "→", "13": "↓",
     "8": "◁▷", "9": "☰", "10": "L3", "11": "R3",
     "3": "△",  "2": "□",  "1": "○",  "0": "×",
@@ -340,7 +340,7 @@ class App:
     def __init__(self, root: ctk.CTk) -> None:
         self.root = root
         self.root.geometry("680x780")
-        self.root.minsize(600, 660)
+        self.root.minsize(800, 660)
 
         # ── Presets ──────────────────────────────────────────────────
         self._settings = presets.load_settings()
@@ -598,12 +598,12 @@ class App:
         row.pack(fill="x", padx=8, pady=(8, 0))
         left = ctk.CTkFrame(row, fg_color="transparent")
         left.pack(side="left")
-        self._build_btn_tile(left, "LT", "6", r=0, c=0, w=96, h=48)
-        self._build_btn_tile(left, "LB", "4", r=0, c=1, w=96, h=48)
+        self._build_btn_tile(left, "L2", "6", r=0, c=0, w=96, h=48)
+        self._build_btn_tile(left, "L1", "4", r=0, c=1, w=96, h=48)
         right = ctk.CTkFrame(row, fg_color="transparent")
         right.pack(side="right")
-        self._build_btn_tile(right, "RB", "5", r=0, c=0, w=96, h=48)
-        self._build_btn_tile(right, "RT", "7", r=0, c=1, w=96, h=48)
+        self._build_btn_tile(right, "R1", "5", r=0, c=0, w=96, h=48)
+        self._build_btn_tile(right, "R2", "7", r=0, c=1, w=96, h=48)
 
     def _build_dpad_cluster(self, parent: ctk.CTkFrame) -> None:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
