@@ -67,8 +67,8 @@ def _default_sticks() -> list[dict]:
             "right": {"type": "mouse_x", "sensitivity": 600},
         },
         {
-            "label": "Direito", "axis_x": 3, "axis_y": 2, "deadzone": 0.15,
-            "sensitivity": 8.0,
+            "label": "Direito", "axis_x": 2, "axis_y": 3, "deadzone": 0.15,
+            "sensitivity": 10000.0,
             "up":    {"type": "none"},
             "down":  {"type": "none"},
             "left":  {"type": "none"},
@@ -424,7 +424,7 @@ class App:
         analog.setdefault("sticks", _default_sticks())
         for i, stick in enumerate(analog["sticks"]):
             stick.setdefault("deadzone", 0.15)
-            stick.setdefault("sensitivity", 600.0 if i == 0 else 8.0)
+            stick.setdefault("sensitivity", 600.0 if i == 0 else 10000.0)
             for d in ("up", "down", "left", "right"):
                 stick.setdefault(d, {"type": "none"})
         return cfg

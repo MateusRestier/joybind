@@ -141,9 +141,13 @@ def scroll_v_relative(clicks: int) -> None:
 
 
 def scroll_h_relative(clicks: int) -> None:
-    """Rola horizontalmente. Positivo = direita, negativo = esquerda."""
+    """Rola horizontalmente via Shift+scroll (mais compatível no Windows que hscroll).
+    Positivo = direita, negativo = esquerda.
+    Shift+scroll_down = direita, Shift+scroll_up = esquerda."""
     try:
-        pyautogui.hscroll(clicks)
+        pyautogui.keyDown("shift")
+        pyautogui.scroll(-clicks)  # negado: scroll_down+Shift = direita
+        pyautogui.keyUp("shift")
     except pyautogui.FailSafeException:
         pass
     except Exception as e:
