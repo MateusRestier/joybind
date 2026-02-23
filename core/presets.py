@@ -4,26 +4,34 @@ core/presets.py — Gerenciamento de presets nomeados.
 Cada preset é um arquivo .json independente com a estrutura:
   {"binds": {"0": {"type": "keyboard", "key": "enter"}, ...}}
 
-O arquivo settings.json (ao lado do programa) persiste:
-  - presets_dir  : caminho da pasta de presets escolhida pelo usuário
-  - last_preset  : caminho absoluto do último preset carregado
+Dados do usuário ficam em %APPDATA%\JoyBind\ (Windows) ou ~/.joybind/ (outros):
+  - settings.json : configurações internas (pasta de presets, último preset)
+  - presets/      : pasta padrão dos presets (pode ser alterada pelo usuário)
 """
 import json
+import os
 import sys
 from pathlib import Path
 
-# Quando compilado com PyInstaller (frozen), usa o diretório do .exe.
-# Em desenvolvimento, usa a raiz do repositório.
-if getattr(sys, "frozen", False):
-    _BASE_DIR = Path(sys.executable).parent
+# Diretório de dados do usuário — invisível para o usuário comum.
+# Windows : %APPDATA%\JoyBind\
+# Outros  : ~/.joybind/
+_APPDATA = os.environ.get("APPDATA")
+if _APPDATA:
+    _CONFIG_DIR = Path(_APPDATA) / "JoyBind"
 else:
-    _BASE_DIR = Path(__file__).parent.parent
+    _CONFIG_DIR = Path.home() / ".joybind"
 
-# Pasta padrão: <raiz>/presets/
-DEFAULT_PRESETS_DIR = _BASE_DIR / "presets"
+_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
-# Arquivo de configurações do app (não versionado)
-SETTINGS_FILE = _BASE_DIR / "settings.json"
+# Em desenvolvimento, presets ficam na raiz do repositório para facilitar testes.
+if getattr(sys, "frozen", False):
+    DEFAULT_PRESETS_DIR = _CONFIG_DIR / "presets"
+else:
+    DEFAULT_PRESETS_DIR = Path(__file__).parent.parent / "presets"
+
+# Arquivo de configurações do app
+SETTINGS_FILE = _CONFIG_DIR / "settings.json"
 
 
 # ── Settings ───────────────────────────────────────────────────────────────
