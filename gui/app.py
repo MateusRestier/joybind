@@ -14,6 +14,7 @@ Thread safety:
 """
 import threading
 import time
+import webbrowser
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, filedialog
@@ -788,6 +789,14 @@ class App:
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
             command=self._on_auto_map,
         ).pack(side="left")
+        ctk.CTkButton(
+            toolbar, text="Feedback", width=90,
+            fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
+            command=lambda: webbrowser.open(
+                "https://docs.google.com/forms/d/e/"
+                "1FAIpQLSfji-06RCfh_Dq7pIa2agyr3ycS8mBK-wK6BVZX-RzGT1N8_g/viewform"
+            ),
+        ).pack(side="right")
 
         # 1. Gatilhos / ombros (topo)
         self._build_trigger_row(scroll)
