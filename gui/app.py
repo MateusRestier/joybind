@@ -67,7 +67,7 @@ def _default_sticks() -> list[dict]:
             "right": {"type": "mouse_x", "sensitivity": 600},
         },
         {
-            "label": "Direito", "axis_x": 2, "axis_y": 3, "deadzone": 0.15,
+            "label": "Direito", "axis_x": 3, "axis_y": 2, "deadzone": 0.15,
             "sensitivity": 8.0,
             "up":    {"type": "none"},
             "down":  {"type": "none"},
