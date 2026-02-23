@@ -9,9 +9,15 @@ O arquivo settings.json (ao lado do programa) persiste:
   - last_preset  : caminho absoluto do último preset carregado
 """
 import json
+import sys
 from pathlib import Path
 
-_BASE_DIR = Path(__file__).parent.parent  # raiz do repositório
+# Quando compilado com PyInstaller (frozen), usa o diretório do .exe.
+# Em desenvolvimento, usa a raiz do repositório.
+if getattr(sys, "frozen", False):
+    _BASE_DIR = Path(sys.executable).parent
+else:
+    _BASE_DIR = Path(__file__).parent.parent
 
 # Pasta padrão: <raiz>/presets/
 DEFAULT_PRESETS_DIR = _BASE_DIR / "presets"
