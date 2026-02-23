@@ -91,6 +91,7 @@ class BindDialog:
         self._edit_key = edit_key
         self._existing_keys = set(existing_keys or [])
         self._capturing_btn = False
+        self._btn_entry: ctk.CTkEntry
 
         # Lista de dicts de controle de cada passo da timeline:
         # [{"row", "num_lbl", "action_var", "param_frame", "widgets"}, ...]
@@ -585,6 +586,10 @@ class BindDialog:
         self._capture_btn_btn.configure(text="Pressione um botão...", state="disabled")
         self._btn_entry.delete(0, "end")
 
+        # Mesmos mapeamentos de controller.py — duplicados aqui para evitar import circular
+        _AXIS_TO_VBTN = {4: 100, 5: 101}
+        _HAT_TO_VBTN  = {(0, 1): 102, (0, -1): 103, (-1, 0): 104, (1, 0): 105}
+
         def capture() -> None:
             try:
                 if not pygame.joystick.get_init():
@@ -598,8 +603,12 @@ class BindDialog:
 
                 joy = pygame.joystick.Joystick(0)
                 joy.init()
-                num_buttons = joy.get_numbuttons()
-                prev = {b: joy.get_button(b) for b in range(num_buttons)}
+                nb = joy.get_numbuttons()
+                na = joy.get_numaxes()
+                nh = joy.get_numhats()
+                prev_b = {b: joy.get_button(b) for b in range(nb)}
+                prev_a = {a: joy.get_axis(a) for a in range(na)}
+                prev_h = {h: joy.get_hat(h) for h in range(nh)}
                 deadline = time.monotonic() + 10.0
 
                 while time.monotonic() < deadline and self._capturing_btn:
@@ -607,14 +616,40 @@ class BindDialog:
                         pygame.event.pump()
                     except Exception:
                         pass
-                    for b in range(num_buttons):
+
+                    # Botões digitais
+                    for b in range(nb):
                         curr = joy.get_button(b)
-                        if curr == 1 and prev.get(b, 0) == 0:
+                        if curr == 1 and prev_b.get(b, 0) == 0:
                             try: joy.quit()
                             except Exception: pass
                             self.dialog.after(0, lambda btn=b: self._on_btn_captured(btn))
                             return
-                        prev[b] = curr
+                        prev_b[b] = curr
+
+                    # Eixos de gatilho (L2/R2) → botão virtual 100/101
+                    for axis_idx, vbtn in _AXIS_TO_VBTN.items():
+                        if axis_idx >= na:
+                            continue
+                        val = joy.get_axis(axis_idx)
+                        if val > 0.5 and prev_a.get(axis_idx, -1.0) <= 0.5:
+                            try: joy.quit()
+                            except Exception: pass
+                            self.dialog.after(0, lambda b=vbtn: self._on_btn_captured(b))
+                            return
+                        prev_a[axis_idx] = val
+
+                    # HAT switches (D-pad) → botão virtual 102-105
+                    for h in range(nh):
+                        curr_h = joy.get_hat(h)
+                        if curr_h in _HAT_TO_VBTN and curr_h != prev_h.get(h, (0, 0)):
+                            try: joy.quit()
+                            except Exception: pass
+                            vbtn = _HAT_TO_VBTN[curr_h]
+                            self.dialog.after(0, lambda b=vbtn: self._on_btn_captured(b))
+                            return
+                        prev_h[h] = curr_h
+
                     time.sleep(1 / 60)
 
                 try: joy.quit()
@@ -691,7 +726,6 @@ class BindDialog:
                 parent=self.dialog,
             )
             return
-
         btn_key = raw_btn
 
         if btn_key in self._existing_keys and btn_key != self._edit_key:
@@ -711,6 +745,17 @@ class BindDialog:
                 messagebox.showerror(
                     "Erro de validação",
                     "Informe o nome da tecla ou use o botão 'Capturar'.",
+                    parent=self.dialog,
+                )
+                return
+            parts = [p.strip() for p in key.split("+") if p.strip()]
+            invalid = [p for p in parts if p not in pyautogui.KEYBOARD_KEYS]
+            if invalid:
+                messagebox.showerror(
+                    "Tecla inválida",
+                    f"Nome(s) de tecla não reconhecido(s): {', '.join(invalid)}\n\n"
+                    "Use o botão 'Capturar' para detectar o nome correto,\n"
+                    "ou consulte a lista de teclas válidas no README.",
                     parent=self.dialog,
                 )
                 return

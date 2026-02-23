@@ -13,6 +13,7 @@ Thread safety:
   • Qualquer atualização de widget usa root.after(0, ...).
 """
 import threading
+import time
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, filedialog
@@ -106,13 +107,16 @@ _SCROLL_SENS_MOUSE_MODE: float = 8.0
 # (60 Hz / 4 = ~15 pressionamentos/s, similar ao auto-repeat padrão do Windows)
 _KEY_REPEAT_FRAMES: int = 4
 
-# Rótulos visuais por btn_key para os tiles do layout do controle
-_BTN_TILE_LABELS: dict[str, str] = {
-    "6": "L2", "4": "L1", "5": "R1", "7": "R2",
-    "12": "↑",  "14": "←", "15": "→", "13": "↓",
-    "8": "◁▷", "9": "☰", "10": "L3", "11": "R3",
-    "3": "△",  "2": "□",  "1": "○",  "0": "×",
-}
+# Layout padrão: vazio — o usuário configura manualmente ou via Auto-mapear.
+_DEFAULT_LAYOUT: dict[str, str] = {}
+
+# Ordem em que o wizard de Auto-mapear percorre os tiles
+_TILE_ORDER: list[str] = [
+    "×", "○", "□", "△",
+    "L1", "R1", "L2", "R2",
+    "▬", "▶", "L3", "R3",
+    "↑", "↓", "←", "→",
+]
 
 
 def _find_sens(stick: dict, target_types: tuple, fallback: float = 600.0) -> float:
@@ -332,6 +336,199 @@ class AnalogDirectionDialog:
         self.dialog.destroy()
 
 
+# ── Wizard de mapeamento automático de botões ──────────────────────────────
+
+class AutoMapWizard:
+    """
+    Percorre cada tile do layout visual e detecta qual botão físico lhe corresponde.
+    O usuário pressiona o botão do controle quando indicado; o número detectado
+    (incluindo HAT e eixos de gatilho) é armazenado no layout.
+
+    Attributes:
+        result (dict[str, str] | None): visual_id → btn_key detectado, ou None se cancelado.
+        dialog (CTkToplevel): Janela do wizard.
+    """
+
+    # Mesmos mapeamentos de controller.py — duplicados aqui para evitar import circular
+    _AXIS_TO_VBTN: dict[int, int] = {4: 100, 5: 101}
+    _HAT_TO_VBTN: dict[tuple[int, int], int] = {
+        (0,  1): 102, (0, -1): 103, (-1, 0): 104, (1, 0): 105,
+    }
+
+    def __init__(
+        self, parent: ctk.CTk, tiles: list[str], current_layout: dict[str, str],
+    ) -> None:
+        self.result: dict[str, str] | None = None
+        self._tiles = tiles
+        self._layout = dict(current_layout)
+        self._idx = 0
+        self._capturing = False
+
+        self.dialog = ctk.CTkToplevel(parent)
+        self.dialog.title("Auto-mapear Botões")
+        self.dialog.geometry("380x300")
+        self.dialog.resizable(False, False)
+        self.dialog.grab_set()
+        self.dialog.lift()
+        self.dialog.focus_force()
+        self.dialog.protocol("WM_DELETE_WINDOW", self._on_cancel)
+        self.dialog.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            self.dialog,
+            text="Pressione cada botão no controle quando solicitado.",
+            font=ctk.CTkFont(size=12),
+            wraplength=340,
+        ).grid(row=0, column=0, pady=(18, 4), padx=20)
+
+        self._progress_lbl = ctk.CTkLabel(
+            self.dialog, text="",
+            font=ctk.CTkFont(size=11), text_color=("gray50", "gray60"),
+        )
+        self._progress_lbl.grid(row=1, column=0)
+
+        self._tile_lbl = ctk.CTkLabel(
+            self.dialog, text="",
+            font=ctk.CTkFont(size=40, weight="bold"),
+        )
+        self._tile_lbl.grid(row=2, column=0, pady=12)
+
+        self._status_lbl = ctk.CTkLabel(
+            self.dialog, text="",
+            font=ctk.CTkFont(size=11), text_color=("gray50", "gray60"),
+        )
+        self._status_lbl.grid(row=3, column=0)
+
+        btn_row = ctk.CTkFrame(self.dialog, fg_color="transparent")
+        btn_row.grid(row=4, column=0, pady=20)
+        ctk.CTkButton(
+            btn_row, text="Cancelar", width=100,
+            fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
+            command=self._on_cancel,
+        ).pack(side="left", padx=6)
+        self._skip_btn = ctk.CTkButton(
+            btn_row, text="Pular", width=80,
+            fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
+            command=self._on_skip,
+        )
+        self._skip_btn.pack(side="left", padx=6)
+
+        self._advance()
+
+    # ── Fluxo ──────────────────────────────────────────────────────
+
+    def _advance(self) -> None:
+        if self._idx >= len(self._tiles):
+            self.result = self._layout
+            self.dialog.destroy()
+            return
+
+        vid = self._tiles[self._idx]
+        current_key = self._layout.get(vid, vid)
+        self._progress_lbl.configure(
+            text=f"Tile {self._idx + 1} de {len(self._tiles)}"
+        )
+        self._tile_lbl.configure(text=vid)
+        self._status_lbl.configure(
+            text=f"Aguardando... (atual: btn {current_key})",
+            text_color=("gray50", "gray60"),
+        )
+        self._skip_btn.configure(state="normal")
+        self._capturing = True
+        threading.Thread(
+            target=self._detect_loop, args=(vid,), daemon=True, name="AutoMap"
+        ).start()
+
+    def _detect_loop(self, vid: str) -> None:
+        try:
+            if not pygame.joystick.get_init():
+                pygame.joystick.init()
+            if pygame.joystick.get_count() == 0:
+                self.dialog.after(0, lambda: self._on_fail("Nenhum controle conectado."))
+                return
+
+            joy = pygame.joystick.Joystick(0)
+            joy.init()
+            nb = joy.get_numbuttons()
+            na = joy.get_numaxes()
+            nh = joy.get_numhats()
+            prev_b = {b: joy.get_button(b) for b in range(nb)}
+            prev_a = {a: joy.get_axis(a) for a in range(na)}
+            prev_h = {h: joy.get_hat(h) for h in range(nh)}
+            deadline = time.monotonic() + 15.0
+
+            while time.monotonic() < deadline and self._capturing:
+                try:
+                    pygame.event.pump()
+                except Exception:
+                    pass
+                for b in range(nb):
+                    curr = joy.get_button(b)
+                    if curr == 1 and prev_b.get(b, 0) == 0:
+                        try: joy.quit()
+                        except Exception: pass
+                        self.dialog.after(0, lambda k=str(b): self._on_detected(vid, k))
+                        return
+                    prev_b[b] = curr
+                for axis_idx, vbtn in self._AXIS_TO_VBTN.items():
+                    if axis_idx >= na:
+                        continue
+                    val = joy.get_axis(axis_idx)
+                    if val > 0.5 and prev_a.get(axis_idx, -1.0) <= 0.5:
+                        try: joy.quit()
+                        except Exception: pass
+                        self.dialog.after(0, lambda k=str(vbtn): self._on_detected(vid, k))
+                        return
+                    prev_a[axis_idx] = val
+                for h in range(nh):
+                    curr_h = joy.get_hat(h)
+                    if curr_h in self._HAT_TO_VBTN and curr_h != prev_h.get(h, (0, 0)):
+                        try: joy.quit()
+                        except Exception: pass
+                        k = str(self._HAT_TO_VBTN[curr_h])
+                        self.dialog.after(0, lambda kk=k: self._on_detected(vid, kk))
+                        return
+                    prev_h[h] = curr_h
+                time.sleep(1 / 60)
+
+            try: joy.quit()
+            except Exception: pass
+            if self._capturing:
+                self.dialog.after(0, lambda: self._on_fail("Tempo esgotado (15 s)."))
+        except Exception as exc:
+            self.dialog.after(0, lambda e=str(exc): self._on_fail(e))
+
+    def _on_detected(self, vid: str, btn_key: str) -> None:
+        self._capturing = False
+        self._layout[vid] = btn_key
+        self._status_lbl.configure(
+            text=f"Detectado: botão {btn_key} ✓",
+            text_color=("#2ecc71", "#2ecc71"),
+        )
+        self._skip_btn.configure(state="disabled")
+        self.dialog.after(700, self._next)
+
+    def _on_fail(self, msg: str) -> None:
+        self._capturing = False
+        self._status_lbl.configure(
+            text=f"Falhou: {msg}", text_color=("#e74c3c", "#e74c3c"),
+        )
+
+    def _next(self) -> None:
+        self._idx += 1
+        self._advance()
+
+    def _on_skip(self) -> None:
+        self._capturing = False
+        self._idx += 1
+        self._advance()
+
+    def _on_cancel(self) -> None:
+        self._capturing = False
+        self.result = None
+        self.dialog.destroy()
+
+
 # ── Classe principal ───────────────────────────────────────────────────────
 
 class App:
@@ -354,9 +551,14 @@ class App:
         )
         self.root.title(title)
 
+        # ── Layout de botões (visual_id → btn_key) ───────────────────
+        # Carregado das configurações globais; _DEFAULT_LAYOUT é usado como fallback.
+        saved_layout = self._settings.get("btn_layout", {})
+        self._layout: dict[str, str] = {**_DEFAULT_LAYOUT, **saved_layout}
+
         # ── Estado geral ──────────────────────────────────────────────
         self._is_listening = False
-        # Tiles clicáveis do layout visual: btn_key → CTkButton
+        # Tiles clicáveis do layout visual: visual_id → CTkButton
         self._btn_tiles: dict[str, ctk.CTkButton] = {}
 
         # ── Estado analógico ──────────────────────────────────────────
@@ -573,6 +775,20 @@ class App:
         analog_cfg = self.cfg.get("analog", {})
         self._analog_enabled_var = ctk.BooleanVar(value=analog_cfg.get("enabled", False))
 
+        # 0. Toolbar de ações rápidas
+        toolbar = ctk.CTkFrame(scroll, fg_color="transparent")
+        toolbar.pack(fill="x", padx=8, pady=(8, 0))
+        ctk.CTkButton(
+            toolbar, text="Limpar Mapeamentos", width=160,
+            fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
+            command=self._on_clear_binds,
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            toolbar, text="Auto-mapear Botões", width=160,
+            fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
+            command=self._on_auto_map,
+        ).pack(side="left")
+
         # 1. Gatilhos / ombros (topo)
         self._build_trigger_row(scroll)
 
@@ -598,12 +814,12 @@ class App:
         row.pack(fill="x", padx=8, pady=(8, 0))
         left = ctk.CTkFrame(row, fg_color="transparent")
         left.pack(side="left")
-        self._build_btn_tile(left, "L2", "6", r=0, c=0, w=96, h=48)
-        self._build_btn_tile(left, "L1", "4", r=0, c=1, w=96, h=48)
+        self._build_btn_tile(left, "L2", r=0, c=0, w=96, h=48)
+        self._build_btn_tile(left, "L1", r=0, c=1, w=96, h=48)
         right = ctk.CTkFrame(row, fg_color="transparent")
         right.pack(side="right")
-        self._build_btn_tile(right, "R1", "5", r=0, c=0, w=96, h=48)
-        self._build_btn_tile(right, "R2", "7", r=0, c=1, w=96, h=48)
+        self._build_btn_tile(right, "R1", r=0, c=0, w=96, h=48)
+        self._build_btn_tile(right, "R2", r=0, c=1, w=96, h=48)
 
     def _build_dpad_cluster(self, parent: ctk.CTkFrame) -> None:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -616,14 +832,14 @@ class App:
         cross = ctk.CTkFrame(frame, fg_color="transparent")
         cross.pack()
         W, H = 82, 50
-        self._build_btn_tile(cross, "↑", "12", r=0, c=1, w=W, h=H)
-        self._build_btn_tile(cross, "←", "14", r=1, c=0, w=W, h=H)
+        self._build_btn_tile(cross, "↑", r=0, c=1, w=W, h=H)
+        self._build_btn_tile(cross, "←", r=1, c=0, w=W, h=H)
         ctk.CTkLabel(
             cross, text="D", width=W, height=H,
             font=ctk.CTkFont(size=18), text_color=("gray45", "gray55"),
         ).grid(row=1, column=1, padx=3, pady=3)
-        self._build_btn_tile(cross, "→", "15", r=1, c=2, w=W, h=H)
-        self._build_btn_tile(cross, "↓", "13", r=2, c=1, w=W, h=H)
+        self._build_btn_tile(cross, "→", r=1, c=2, w=W, h=H)
+        self._build_btn_tile(cross, "↓", r=2, c=1, w=W, h=H)
 
     def _build_face_cluster(self, parent: ctk.CTkFrame) -> None:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -636,14 +852,14 @@ class App:
         cross = ctk.CTkFrame(frame, fg_color="transparent")
         cross.pack()
         W, H = 82, 50
-        self._build_btn_tile(cross, "△", "3", r=0, c=1, w=W, h=H)
-        self._build_btn_tile(cross, "□", "2", r=1, c=0, w=W, h=H)
+        self._build_btn_tile(cross, "△", r=0, c=1, w=W, h=H)
+        self._build_btn_tile(cross, "□", r=1, c=0, w=W, h=H)
         ctk.CTkLabel(
             cross, text="◎", width=W, height=H,
             font=ctk.CTkFont(size=18), text_color=("gray45", "gray55"),
         ).grid(row=1, column=1, padx=3, pady=3)
-        self._build_btn_tile(cross, "○", "1", r=1, c=2, w=W, h=H)
-        self._build_btn_tile(cross, "×", "0", r=2, c=1, w=W, h=H)
+        self._build_btn_tile(cross, "○", r=1, c=2, w=W, h=H)
+        self._build_btn_tile(cross, "×", r=2, c=1, w=W, h=H)
 
     def _build_center_cluster(self, parent: ctk.CTkFrame) -> None:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -656,10 +872,10 @@ class App:
         grid = ctk.CTkFrame(frame, fg_color="transparent")
         grid.pack()
         W, H = 88, 50
-        self._build_btn_tile(grid, "◁▷", "8",  r=0, c=0, w=W, h=H)
-        self._build_btn_tile(grid, "☰",  "9",  r=0, c=1, w=W, h=H)
-        self._build_btn_tile(grid, "L3", "10", r=1, c=0, w=W, h=H)
-        self._build_btn_tile(grid, "R3", "11", r=1, c=1, w=W, h=H)
+        self._build_btn_tile(grid, "▬", r=0, c=0, w=W, h=H)
+        self._build_btn_tile(grid, "▶",  r=0, c=1, w=W, h=H)
+        self._build_btn_tile(grid, "L3", r=1, c=0, w=W, h=H)
+        self._build_btn_tile(grid, "R3", r=1, c=1, w=W, h=H)
         ctk.CTkSwitch(
             frame,
             text="Analógico → Mouse",
@@ -669,25 +885,29 @@ class App:
         ).pack(pady=(10, 4))
 
     def _build_btn_tile(
-        self, parent: ctk.CTkFrame, label: str, btn_key: str,
+        self, parent: ctk.CTkFrame, visual_id: str,
         r: int, c: int, w: int = 88, h: int = 54,
     ) -> ctk.CTkButton:
         """Cria um tile clicável para um botão físico do controle."""
+        btn_key = self._layout.get(visual_id)
+        key_label = btn_key if btn_key is not None else "—"
         btn = ctk.CTkButton(
             parent,
-            text=f"{label}\n{self._btn_tile_text(btn_key)}",
+            text=f"{visual_id} ({key_label})\n{self._btn_tile_text(btn_key)}",
             width=w, height=h,
             fg_color=("gray68", "gray28"),
             hover_color=("gray58", "gray38"),
             font=ctk.CTkFont(size=11),
-            command=lambda k=btn_key: self._on_btn_tile_click(k),
+            command=lambda vid=visual_id: self._on_btn_tile_click(vid),
         )
         btn.grid(row=r, column=c, padx=3, pady=3)
-        self._btn_tiles[btn_key] = btn
+        self._btn_tiles[visual_id] = btn
         return btn
 
-    def _btn_tile_text(self, btn_key: str) -> str:
+    def _btn_tile_text(self, btn_key: str | None) -> str:
         """Retorna texto resumido da binding atual para exibir no tile."""
+        if btn_key is None:
+            return "—"
         bind = self.cfg["binds"].get(btn_key)
         if not bind:
             return "—"
@@ -701,31 +921,70 @@ class App:
             return "\U0001f5b1 mouse"
         return "—"
 
-    def _on_btn_tile_click(self, btn_key: str) -> None:
-        existing = self.cfg["binds"].get(btn_key)
+    def _on_btn_tile_click(self, vid: str) -> None:
+        btn_key = self._layout.get(vid)
+        existing = self.cfg["binds"].get(btn_key) if btn_key else None
         dlg = BindDialog(
             self.root,
-            title=f"Configurar — Botão {btn_key}",
+            title=f"Configurar — {vid}",
             edit_key=btn_key,
             edit_bind=existing,
             existing_keys=[k for k in self.cfg["binds"] if k != btn_key],
         )
         self.root.wait_window(dlg.dialog)
         if dlg.result:
-            old_key = btn_key
             new_key = dlg.result["button"]
-            if old_key in self.cfg["binds"]:
-                del self.cfg["binds"][old_key]
+            if btn_key and btn_key in self.cfg["binds"] and btn_key != new_key:
+                del self.cfg["binds"][btn_key]
             self.cfg["binds"][new_key] = dlg.result["bind"]
+            self._layout[vid] = new_key
+            self._settings["btn_layout"] = dict(self._layout)
+            presets.save_settings(self._settings)
             self._update_btn_tiles()
             self._save_current_preset()
 
     def _update_btn_tiles(self) -> None:
         """Atualiza o texto de todos os tiles com as bindings atuais do cfg."""
-        for key, btn in self._btn_tiles.items():
-            label = _BTN_TILE_LABELS.get(key, key)
-            btn.configure(text=f"{label}\n{self._btn_tile_text(key)}")
+        for vid, btn in self._btn_tiles.items():
+            btn_key = self._layout.get(vid)
+            key_label = btn_key if btn_key is not None else "—"
+            btn.configure(text=f"{vid} ({key_label})\n{self._btn_tile_text(btn_key)}")
         self._update_analog_btn_states()
+
+    def _on_clear_binds(self) -> None:
+        """Limpa todos os mapeamentos e reseta os números de botão para o padrão."""
+        if messagebox.askyesno(
+            "Confirmar",
+            "Limpar todos os mapeamentos e restaurar os números de botão padrão?",
+            parent=self.root,
+        ):
+            self.cfg["binds"] = {}
+            self._layout = dict(_DEFAULT_LAYOUT)
+            self._settings["btn_layout"] = dict(_DEFAULT_LAYOUT)
+            presets.save_settings(self._settings)
+            self._update_btn_tiles()
+            self._save_current_preset()
+
+    def _on_auto_map(self) -> None:
+        """Abre o wizard de detecção automática de botões."""
+        wizard = AutoMapWizard(self.root, _TILE_ORDER, self._layout.copy())
+        self.root.wait_window(wizard.dialog)
+        if wizard.result is not None:
+            new_layout = wizard.result
+            # Migra binds: move cfg["binds"][old_key] → cfg["binds"][new_key]
+            old_binds = dict(self.cfg["binds"])
+            self.cfg["binds"] = {}
+            for vid, new_key in new_layout.items():
+                old_key = self._layout.get(vid)
+                if old_key in old_binds:
+                    self.cfg["binds"][new_key] = old_binds.pop(old_key)
+            # Mantém binds de chaves que não fazem parte de nenhum tile
+            self.cfg["binds"].update(old_binds)
+            self._layout = new_layout
+            self._settings["btn_layout"] = new_layout
+            presets.save_settings(self._settings)
+            self._update_btn_tiles()
+            self._save_current_preset()
 
     # ──────────────────────────────────────────────────────────────
     # Painel de analógico (cross pattern)

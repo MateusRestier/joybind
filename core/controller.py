@@ -14,6 +14,28 @@ import threading
 import pygame
 from typing import Callable, Optional
 
+# Threshold para considerar um eixo de gatilho como "pressionado".
+# Gatilhos PS geralmente vão de -1.0 (solto) a +1.0 (pressionado).
+_TRIGGER_THRESHOLD: float = 0.5
+
+# Mapeamento eixo de gatilho → índice de botão virtual.
+# Eixos 4 e 5 são L2/R2 em controles PlayStation via SDL2/pygame no Windows.
+# Usa índices 100+ para evitar colisão com botões digitais reais (0-13 em PS4).
+_TRIGGER_AXIS_TO_BTN: dict[int, int] = {
+    4: 100,   # L2 analógico → botão virtual L2
+    5: 101,   # R2 analógico → botão virtual R2
+}
+
+# Mapeamento de direção do HAT switch → índice de botão virtual.
+# O HAT 0 é como a maioria dos controles PlayStation reporta o D-pad.
+# Usa índices 102+ para evitar colisão com botões digitais reais.
+_HAT_DIRECTION_TO_BTN: dict[tuple[int, int], int] = {
+    (0,  1): 102,   # ↑ cima
+    (0, -1): 103,   # ↓ baixo
+    (-1, 0): 104,   # ← esquerda
+    (1,  0): 105,   # → direita
+}
+
 
 class ControllerListener:
     """
@@ -175,6 +197,7 @@ class ControllerListener:
           • Isso evita múltiplos disparos enquanto o botão é mantido pressionado.
         """
         prev_states: dict[int, int] = {}
+        prev_hat_states: dict[int, tuple[int, int]] = {}
         clock = pygame.time.Clock()
 
         while self._running:
@@ -197,6 +220,33 @@ class ControllerListener:
                         self.on_button_press(btn)
 
                     prev_states[btn] = current
+
+                # Poll eixos de gatilho como botões (L2/R2 em controles PlayStation).
+                # Ativa o botão virtual quando o eixo cruza _TRIGGER_THRESHOLD.
+                n_axes = self._joystick.get_numaxes()
+                for axis_idx, vbtn in _TRIGGER_AXIS_TO_BTN.items():
+                    if axis_idx >= n_axes:
+                        continue
+                    axis_val = self._joystick.get_axis(axis_idx)
+                    current  = 1 if axis_val > _TRIGGER_THRESHOLD else 0
+                    previous = prev_states.get(-(axis_idx + 1), 0)  # chave negativa evita colisão
+                    if current == 1 and previous == 0:
+                        self.on_button_press(vbtn)
+                    prev_states[-(axis_idx + 1)] = current
+
+                # Poll HAT switches (D-pad em controles PlayStation e similares).
+                # Cada direção ativa dispara on_button_press com o índice virtual
+                # definido em _HAT_DIRECTION_TO_BTN.
+                n_hats = self._joystick.get_numhats()
+                for hat_idx in range(n_hats):
+                    hx, hy = self._joystick.get_hat(hat_idx)
+                    prev_hat = prev_hat_states.get(hat_idx, (0, 0))
+                    for (dx, dy), vbtn in _HAT_DIRECTION_TO_BTN.items():
+                        current_active = (hx == dx and hy == dy)
+                        prev_active    = (prev_hat[0] == dx and prev_hat[1] == dy)
+                        if current_active and not prev_active:
+                            self.on_button_press(vbtn)
+                    prev_hat_states[hat_idx] = (hx, hy)
 
                 # Envia estado atual de todos os eixos analógicos
                 if self.on_axes_update is not None:
