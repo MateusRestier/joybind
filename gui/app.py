@@ -14,6 +14,7 @@ Thread safety:
 """
 import threading
 from pathlib import Path
+import tkinter as tk
 from tkinter import messagebox, filedialog
 
 import pygame
@@ -529,8 +530,43 @@ class App:
         outer.grid_columnconfigure(0, weight=1)
         outer.grid_rowconfigure(0, weight=1)
 
-        scroll = ctk.CTkScrollableFrame(outer, fg_color="transparent")
-        scroll.grid(row=0, column=0, sticky="nsew")
+        # ── Canvas com scroll vertical (sempre) + horizontal (quando necessário) ──
+        fg   = outer.cget("fg_color")
+        mode = ctk.get_appearance_mode()
+        bg   = (fg[1] if mode == "Dark" else fg[0]) if isinstance(fg, (list, tuple)) else fg
+
+        canvas = tk.Canvas(outer, highlightthickness=0, bg=bg, bd=0)
+        vbar   = ctk.CTkScrollbar(outer, orientation="vertical",   command=canvas.yview)
+        hbar   = ctk.CTkScrollbar(outer, orientation="horizontal", command=canvas.xview)
+        canvas.configure(yscrollcommand=vbar.set, xscrollcommand=hbar.set)
+
+        vbar.grid(row=0, column=1, sticky="ns")
+        canvas.grid(row=0, column=0, sticky="nsew")
+        # hbar começa oculta — aparece automaticamente quando o conteúdo é mais largo
+
+        scroll = ctk.CTkFrame(canvas, fg_color="transparent")
+        win_id = canvas.create_window((0, 0), window=scroll, anchor="nw")
+
+        def _update_scroll_region(event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            if scroll.winfo_reqwidth() > canvas.winfo_width():
+                hbar.grid(row=1, column=0, sticky="ew")
+            else:
+                hbar.grid_remove()
+
+        def _fit_width(event):
+            canvas.itemconfig(win_id, width=max(scroll.winfo_reqwidth(), event.width))
+            _update_scroll_region()
+
+        scroll.bind("<Configure>", _update_scroll_region)
+        canvas.bind("<Configure>", _fit_width)
+
+        # Scroll de mouse só actua quando o cursor está sobre esta área
+        def _wheel(ev):
+            canvas.yview_scroll(int(-1 * ev.delta / 120), "units")
+        outer.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _wheel))
+        outer.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+
         scroll.grid_columnconfigure(0, weight=1)
 
         # Inicializa var do toggle antes de _render_analog_config
