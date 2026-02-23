@@ -113,9 +113,9 @@ _DEFAULT_LAYOUT: dict[str, str] = {}
 
 # Ordem em que o wizard de Auto-mapear percorre os tiles
 _TILE_ORDER: list[str] = [
-    "×", "○", "□", "△",
-    "L1", "R1", "L2", "R2",
-    "▬", "▶", "L3", "R3",
+    "A", "B", "X", "Y",
+    "LB", "RB", "LT", "RT",
+    "SELECT", "START", "LS", "RS",
     "↑", "↓", "←", "→",
 ]
 
@@ -823,12 +823,12 @@ class App:
         row.pack(fill="x", padx=8, pady=(8, 0))
         left = ctk.CTkFrame(row, fg_color="transparent")
         left.pack(side="left")
-        self._build_btn_tile(left, "L2", r=0, c=0, w=96, h=48)
-        self._build_btn_tile(left, "L1", r=0, c=1, w=96, h=48)
+        self._build_btn_tile(left, "LT", r=0, c=0, w=96, h=48)
+        self._build_btn_tile(left, "LB", r=0, c=1, w=96, h=48)
         right = ctk.CTkFrame(row, fg_color="transparent")
         right.pack(side="right")
-        self._build_btn_tile(right, "R1", r=0, c=0, w=96, h=48)
-        self._build_btn_tile(right, "R2", r=0, c=1, w=96, h=48)
+        self._build_btn_tile(right, "RB", r=0, c=0, w=96, h=48)
+        self._build_btn_tile(right, "RT", r=0, c=1, w=96, h=48)
 
     def _build_dpad_cluster(self, parent: ctk.CTkFrame) -> None:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -861,14 +861,14 @@ class App:
         cross = ctk.CTkFrame(frame, fg_color="transparent")
         cross.pack()
         W, H = 82, 50
-        self._build_btn_tile(cross, "△", r=0, c=1, w=W, h=H)
-        self._build_btn_tile(cross, "□", r=1, c=0, w=W, h=H)
+        self._build_btn_tile(cross, "Y", r=0, c=1, w=W, h=H)
+        self._build_btn_tile(cross, "X", r=1, c=0, w=W, h=H)
         ctk.CTkLabel(
             cross, text="◎", width=W, height=H,
             font=ctk.CTkFont(size=18), text_color=("gray45", "gray55"),
         ).grid(row=1, column=1, padx=3, pady=3)
-        self._build_btn_tile(cross, "○", r=1, c=2, w=W, h=H)
-        self._build_btn_tile(cross, "×", r=2, c=1, w=W, h=H)
+        self._build_btn_tile(cross, "B", r=1, c=2, w=W, h=H)
+        self._build_btn_tile(cross, "A", r=2, c=1, w=W, h=H)
 
     def _build_center_cluster(self, parent: ctk.CTkFrame) -> None:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -881,10 +881,10 @@ class App:
         grid = ctk.CTkFrame(frame, fg_color="transparent")
         grid.pack()
         W, H = 88, 50
-        self._build_btn_tile(grid, "▬", r=0, c=0, w=W, h=H)
-        self._build_btn_tile(grid, "▶",  r=0, c=1, w=W, h=H)
-        self._build_btn_tile(grid, "L3", r=1, c=0, w=W, h=H)
-        self._build_btn_tile(grid, "R3", r=1, c=1, w=W, h=H)
+        self._build_btn_tile(grid, "SELECT", r=0, c=0, w=W, h=H)
+        self._build_btn_tile(grid, "START",  r=0, c=1, w=W, h=H)
+        self._build_btn_tile(grid, "LS", r=1, c=0, w=W, h=H)
+        self._build_btn_tile(grid, "RS", r=1, c=1, w=W, h=H)
         ctk.CTkSwitch(
             frame,
             text="Analógico → Mouse",
