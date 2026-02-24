@@ -62,13 +62,12 @@ def main() -> None:
     # Ícone da janela: gera .ico no temp e aplica no titlebar + taskbar
     if _LOGO_PATH.exists():
         try:
-            pil_img = Image.open(_LOGO_PATH)
+            pil_img = Image.open(_LOGO_PATH).convert("RGBA")
             ico_path = Path(tempfile.gettempdir()) / "joybind_icon.ico"
-            pil_img.save(
-                str(ico_path),
-                format="ICO",
-                sizes=[(256, 256), (64, 64), (48, 48), (32, 32), (16, 16)],
-            )
+            _sizes = [(256,256),(128,128),(96,96),(72,72),(64,64),
+                      (48,48),(40,40),(32,32),(24,24),(20,20),(16,16)]
+            _frames = [pil_img.resize(s, Image.LANCZOS) for s in _sizes]
+            _frames[0].save(str(ico_path), format="ICO", append_images=_frames[1:])
             ico_str = str(ico_path)
             root.iconbitmap(ico_str)                             # titlebar
             root.after(0, lambda: _apply_taskbar_icon(root, ico_str))  # taskbar
