@@ -20,12 +20,19 @@ from tkinter import messagebox, filedialog
 
 import pygame
 import customtkinter as ctk
+from PIL import Image
 from pynput.keyboard import Listener as KeyListener
 
 from core import presets
 from core import actions
 from core.controller import ControllerListener
 from .bind_dialog import BindDialog, SequenceDialog
+
+# ── Recursos ───────────────────────────────────────────────────────────────
+# Funciona tanto em desenvolvimento quanto em executável PyInstaller (onefile).
+import sys as _sys
+_BASE = Path(_sys._MEIPASS) if getattr(_sys, "frozen", False) else Path(__file__).resolve().parent.parent
+_LOGO_PATH = _BASE / "img" / "logo.png"
 
 # ── Cores ──────────────────────────────────────────────────────────────────
 _COLOR_ACTIVE          = "#2ecc71"
@@ -643,15 +650,27 @@ class App:
     def _build_header(self) -> None:
         frame = ctk.CTkFrame(self.root, corner_radius=0, fg_color=("gray85", "gray17"))
         frame.grid(row=0, column=0, sticky="ew")
-        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_columnconfigure(1, weight=1)
+
+        # Logo (coluna 0, ocupa as duas linhas de texto)
+        if _LOGO_PATH.exists():
+            pil_img = Image.open(_LOGO_PATH)
+            logo_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(48, 48))
+            ctk.CTkLabel(frame, image=logo_img, text="").grid(
+                row=0, column=0, rowspan=2, padx=(16, 4), pady=10,
+            )
+            col_text = 1
+        else:
+            col_text = 0
+
         ctk.CTkLabel(
             frame, text="JoyBind",
             font=ctk.CTkFont(size=24, weight="bold"), anchor="w",
-        ).grid(row=0, column=0, padx=20, pady=(14, 2), sticky="w")
+        ).grid(row=0, column=col_text, padx=(8, 20) if col_text else 20, pady=(14, 2), sticky="w")
         ctk.CTkLabel(
             frame, text="Mapeador de Controle  →  Teclado / Mouse",
             font=ctk.CTkFont(size=11), text_color=("gray55", "gray60"), anchor="w",
-        ).grid(row=1, column=0, padx=20, pady=(0, 12), sticky="w")
+        ).grid(row=1, column=col_text, padx=(8, 20) if col_text else 20, pady=(0, 12), sticky="w")
 
     def _build_preset_bar(self) -> None:
         frame = ctk.CTkFrame(self.root)

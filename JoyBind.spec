@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = []
+datas = [('img', 'img')]   # logo e recursos visuais
 binaries = []
 hiddenimports = ['pynput.keyboard', 'pynput.mouse']
 tmp_ret = collect_all('customtkinter')
