@@ -6,17 +6,44 @@ Execute com:
     python main.py
 """
 import sys
+import ctypes
+import tempfile
 from pathlib import Path
 
 import pygame
 import customtkinter as ctk
-from PIL import Image, ImageTk
+from PIL import Image
 
 from gui.app import App
 
 # Caminho base funciona tanto em dev quanto em executável PyInstaller
 _BASE = Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 _LOGO_PATH = _BASE / "img" / "logo.png"
+
+# Windows: identifica o processo como app própria, não como python.exe.
+# Precisa ser chamado ANTES de qualquer janela ser criada.
+if sys.platform == "win32":
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("mateus.joybind.1")
+
+
+def _apply_taskbar_icon(root: ctk.CTk, ico_path: str) -> None:
+    """Envia WM_SETICON para o HWND real da janela (barra de tarefas)."""
+    try:
+        # LoadImage com LR_LOADFROMFILE retorna um HICON
+        hicon = ctypes.windll.user32.LoadImageW(
+            None, ico_path,
+            1,                      # IMAGE_ICON
+            0, 0,                   # cx, cy = 0 → usa tamanho default do sistema
+            0x00000010 | 0x00000040,  # LR_LOADFROMFILE | LR_DEFAULTSIZE
+        )
+        if not hicon:
+            return
+        # O HWND da barra de tarefas é o pai do frame interno do Tk
+        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+        ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon)  # WM_SETICON, ICON_BIG
+        ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon)  # WM_SETICON, ICON_SMALL
+    except Exception as e:
+        print(f"[Icon] Erro ao definir ícone na taskbar: {e}")
 
 
 def main() -> None:
@@ -32,12 +59,21 @@ def main() -> None:
     # ── Janela principal ───────────────────────────────────────────
     root = ctk.CTk()
 
-    # Ícone da janela (barra de tarefas + titlebar)
+    # Ícone da janela: gera .ico no temp e aplica no titlebar + taskbar
     if _LOGO_PATH.exists():
-        pil_icon = Image.open(_LOGO_PATH).resize((256, 256))
-        _icon_photo = ImageTk.PhotoImage(pil_icon)
-        root.iconphoto(True, _icon_photo)
-        root._icon_photo = _icon_photo  # evita garbage collection
+        try:
+            pil_img = Image.open(_LOGO_PATH)
+            ico_path = Path(tempfile.gettempdir()) / "joybind_icon.ico"
+            pil_img.save(
+                str(ico_path),
+                format="ICO",
+                sizes=[(256, 256), (64, 64), (48, 48), (32, 32), (16, 16)],
+            )
+            ico_str = str(ico_path)
+            root.iconbitmap(ico_str)                             # titlebar
+            root.after(0, lambda: _apply_taskbar_icon(root, ico_str))  # taskbar
+        except Exception as e:
+            print(f"[Icon] Erro ao definir ícone: {e}")
 
     app = App(root)
 
