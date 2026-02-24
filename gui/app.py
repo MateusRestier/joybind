@@ -690,9 +690,13 @@ class App:
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
         ).grid(row=0, column=2, padx=(4, 0), pady=7)
         ctk.CTkButton(
+            frame, text="Apagar", width=76, command=self._delete_current_preset,
+            fg_color=("#b33030", "#7a1f1f"), hover_color=("#8c2020", "#5c1010"),
+        ).grid(row=0, column=3, padx=(4, 0), pady=7)
+        ctk.CTkButton(
             frame, text="Pasta...", width=80, command=self._change_presets_folder,
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
-        ).grid(row=0, column=3, padx=(4, 14), pady=7)
+        ).grid(row=0, column=4, padx=(4, 14), pady=7)
 
     def _build_controller_row(self) -> None:
         frame = ctk.CTkFrame(self.root)
@@ -1452,6 +1456,28 @@ class App:
             self.root.title(f"JoyBind — {safe}")
             self._update_btn_tiles()
             self._render_analog_config()
+
+    def _delete_current_preset(self) -> None:
+        if not self._current_preset_path or not self._current_preset_path.exists():
+            return
+        name = self._current_preset_path.stem
+        if not messagebox.askyesno(
+            "Apagar preset",
+            f"Apagar o preset '{name}'?\n\nEsta ação não pode ser desfeita.",
+            parent=self.root,
+        ):
+            return
+        self._current_preset_path.unlink()
+        # Carrega o próximo preset disponível; cria default se não houver nenhum
+        lst = presets.list_presets(self._presets_dir)
+        if lst:
+            self._apply_preset(lst[0])
+        else:
+            dp = self._presets_dir / "default.json"
+            cfg: dict = {"binds": {}, "analog": {"enabled": False, "sticks": _default_sticks()}}
+            presets.save_preset(dp, cfg)
+            self._apply_preset(dp)
+        self._refresh_preset_dropdown()
 
     def _change_presets_folder(self) -> None:
         folder = filedialog.askdirectory(
