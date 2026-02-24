@@ -3,12 +3,50 @@ core/actions.py — Execução das ações mapeadas.
 
 Funções thread-safe chamáveis a partir da thread do controller ou de workers.
 """
+import sys
 import time
+import ctypes
 import pyautogui
 
 # Remove o delay padrão de 0.1 s entre cada chamada pyautogui.
 pyautogui.PAUSE = 0
 pyautogui.FAILSAFE = True
+
+# ── SendInput (Windows) — movimento relativo compatível com Raw Input ─────────
+# pyautogui.move() usa SetCursorPos, que jogos como Minecraft ignoram porque
+# registram WM_INPUT (Raw Input API). SendInput com MOUSEEVENTF_MOVE gera o
+# evento real de hardware que o Raw Input consome.
+
+if sys.platform == "win32":
+    class _MOUSEINPUT(ctypes.Structure):
+        _fields_ = [
+            ("dx",          ctypes.c_long),
+            ("dy",          ctypes.c_long),
+            ("mouseData",   ctypes.c_ulong),
+            ("dwFlags",     ctypes.c_ulong),
+            ("time",        ctypes.c_ulong),
+            ("dwExtraInfo", ctypes.c_size_t),  # ULONG_PTR
+        ]
+
+    class _INPUT(ctypes.Structure):
+        _fields_ = [
+            ("type", ctypes.c_ulong),
+            ("mi",   _MOUSEINPUT),
+        ]
+
+    _INPUT_MOUSE      = 0
+    _MOUSEEVENTF_MOVE = 0x0001
+
+    def _win_send_mouse_move(dx: int, dy: int) -> None:
+        inp = _INPUT(type=_INPUT_MOUSE)
+        inp.mi.dx      = dx
+        inp.mi.dy      = dy
+        inp.mi.dwFlags = _MOUSEEVENTF_MOVE
+        ctypes.windll.user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
+
+    _HAS_SENDINPUT = True
+else:
+    _HAS_SENDINPUT = False
 
 
 # ── Ações simples ─────────────────────────────────────────────────────────────
@@ -129,9 +167,16 @@ def execute_sequence(steps: list[dict]) -> None:
 # ── Movimento analógico contínuo ───────────────────────────────────────────
 
 def move_mouse_relative(dx: int, dy: int) -> None:
-    """Move o cursor de forma relativa (chamado continuamente pelo loop analógico)."""
+    """Move o mouse de forma relativa.
+
+    Usa SendInput no Windows (compatível com Raw Input de jogos como Minecraft).
+    Fallback para pyautogui.move() em outras plataformas.
+    """
     try:
-        pyautogui.move(dx, dy)
+        if _HAS_SENDINPUT:
+            _win_send_mouse_move(dx, dy)
+        else:
+            pyautogui.move(dx, dy)
     except pyautogui.FailSafeException:
         pass
     except Exception as e:
