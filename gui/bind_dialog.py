@@ -140,6 +140,7 @@ class BindDialog:
         existing_keys: list[str] | None = None,
     ) -> None:
         self.result: dict | None = None
+        self.clear_result: bool = False
         self._edit_key = edit_key
         self._existing_keys = set(existing_keys or [])
         self._capturing_btn = False
@@ -203,10 +204,16 @@ class BindDialog:
         type_frame.grid(row=2, column=0, sticky="ew", padx=16, pady=6)
 
         ctk.CTkLabel(
-            type_frame, text="Tipo de Ação:", font=ctk.CTkFont(weight="bold")
+            type_frame, text="Ação:", font=ctk.CTkFont(weight="bold")
         ).pack(side="left", padx=(0, 14))
 
-        self._type_var = ctk.StringVar(value="keyboard")
+        # "none" é o padrão — ação é opcional
+        self._type_var = ctk.StringVar(value="none")
+        ctk.CTkRadioButton(
+            type_frame, text="Nenhuma",
+            variable=self._type_var, value="none",
+            command=self._on_type_change,
+        ).pack(side="left", padx=6)
         ctk.CTkRadioButton(
             type_frame, text="Tecla / Clique",
             variable=self._type_var, value="keyboard",
@@ -227,22 +234,43 @@ class BindDialog:
         self._build_keyboard_panel()
         self._build_sequence_panel()
 
+        # Hint exibido quando "Nenhuma" está selecionado
+        self._none_hint = ctk.CTkLabel(
+            self._fields_container,
+            text="Nenhuma ação — o botão é mapeado sem executar nada.",
+            text_color=("gray50", "gray55"),
+            font=ctk.CTkFont(size=12, slant="italic"),
+        )
+
         # ── Separador + botões de confirmação ─────────────────────
         ctk.CTkFrame(self.dialog, height=1, fg_color=("gray70", "gray35")).grid(
             row=4, column=0, sticky="ew", padx=16, pady=(6, 4)
         )
         action_frame = ctk.CTkFrame(self.dialog, fg_color="transparent")
         action_frame.grid(row=5, column=0, sticky="ew", padx=16, pady=(4, 16))
+        # Coluna 2 absorve o espaço livre — mantém os grupos colados nas bordas
+        action_frame.grid_columnconfigure(2, weight=1)
 
+        ctk.CTkButton(
+            action_frame, text="Limpar", width=100,
+            fg_color=("#b33030", "#7a1f1f"), hover_color=("#8c2020", "#5c1010"),
+            command=self._on_clear,
+        ).grid(row=0, column=0, padx=(0, 6))
+        ctk.CTkButton(
+            action_frame, text="Mapear botão", width=120,
+            fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
+            command=self._start_btn_capture,
+        ).grid(row=0, column=1)
+        # coluna 2 = spacer
+        ctk.CTkButton(
+            action_frame, text="Salvar", width=110,
+            command=self._save,
+        ).grid(row=0, column=3, padx=(0, 6))
         ctk.CTkButton(
             action_frame, text="Cancelar", width=110,
             fg_color=("gray70", "gray30"), hover_color=("gray60", "gray40"),
             command=self._on_close,
-        ).pack(side="right", padx=(6, 0))
-        ctk.CTkButton(
-            action_frame, text="  Salvar", width=120,
-            command=self._save,
-        ).pack(side="right")
+        ).grid(row=0, column=4)
 
     # ──────────────────────────────────────────────────────────────
     # PAINEL DE TECLADO
@@ -351,13 +379,17 @@ class BindDialog:
         ).pack(side="left")
 
     def _on_type_change(self) -> None:
-        """Alterna entre o painel de teclado e o de sequência."""
+        """Alterna entre os painéis de ação."""
         self._kb_frame.pack_forget()
         self._seq_frame.pack_forget()
-        if self._type_var.get() == "keyboard":
+        self._none_hint.pack_forget()
+        t = self._type_var.get()
+        if t == "keyboard":
             self._kb_frame.pack(fill="both", expand=True)
-        else:
+        elif t == "sequence":
             self._seq_frame.pack(fill="both", expand=True)
+        else:
+            self._none_hint.pack(pady=20)
 
     # ──────────────────────────────────────────────────────────────
     # GERENCIAMENTO DE PASSOS DA TIMELINE
@@ -529,8 +561,19 @@ class BindDialog:
             e.pack(side="left")
             widgets["clicks"] = e
 
-        # Ações sem parâmetros:
-        # save_mouse, restore_mouse, click_left, click_right, click_middle, double_click
+        elif action in ("click_left", "click_right", "click_middle", "double_click"):
+            ctk.CTkLabel(parent, text="Segurar (ms):").pack(side="left", padx=(0, 4))
+            hold_e = ctk.CTkEntry(parent, width=52, placeholder_text="100")
+            hold_ms_val = step_data.get("hold_ms", 100)
+            hold_e.insert(0, str(hold_ms_val))
+            hold_e.pack(side="left", padx=(0, 8))
+            widgets["hold_ms"] = hold_e
+            ctk.CTkLabel(
+                parent,
+                text="(útil para emuladores como Citra)",
+                text_color=("gray50", "gray55"),
+                font=ctk.CTkFont(size=11),
+            ).pack(side="left")
 
     def _extract_step_data(self, entry: dict) -> dict:
         """Lê os valores atuais dos widgets e retorna o dict do passo."""
@@ -556,6 +599,12 @@ class BindDialog:
         elif action in ("scroll_up", "scroll_down"):
             try:    step["clicks"] = int(w["clicks"].get() or 3)
             except ValueError: step["clicks"] = 3
+
+        elif action in ("click_left", "click_right", "click_middle", "double_click"):
+            try:
+                step["hold_ms"] = max(0, int(w["hold_ms"].get() or 0))
+            except (ValueError, KeyError):
+                step["hold_ms"] = 100
 
         return step
 
@@ -803,6 +852,9 @@ class BindDialog:
             for step in bind.get("steps", []):
                 self._render_step(step)
 
+        elif bind_type == "none":
+            self._type_var.set("none")
+
         elif bind_type == "mouse_combo":
             # Compatibilidade retroativa: converte para sequência equivalente.
             # "Salvar e restaurar posição" vira a checkbox do move_mouse.
@@ -819,6 +871,12 @@ class BindDialog:
 
     def _on_close(self) -> None:
         self._capturing_btn = False
+        self.dialog.destroy()
+
+    def _on_clear(self) -> None:
+        """Limpa o mapeamento deste botão específico e fecha o diálogo."""
+        self._capturing_btn = False
+        self.clear_result = True
         self.dialog.destroy()
 
     # ──────────────────────────────────────────────────────────────
@@ -881,6 +939,9 @@ class BindDialog:
                 return
             steps = [self._extract_step_data(e) for e in self._seq_steps]
             bind_data = {"type": "sequence", "steps": steps}
+
+        elif bind_type == "none":
+            bind_data = {"type": "none"}
 
         else:
             return
@@ -1078,6 +1139,20 @@ class SequenceDialog:
             e.pack(side="left")
             widgets["clicks"] = e
 
+        elif action in ("click_left", "click_right", "click_middle", "double_click"):
+            ctk.CTkLabel(parent, text="Segurar (ms):").pack(side="left", padx=(0, 4))
+            hold_e = ctk.CTkEntry(parent, width=52, placeholder_text="100")
+            hold_ms_val = step_data.get("hold_ms", 100)
+            hold_e.insert(0, str(hold_ms_val))
+            hold_e.pack(side="left", padx=(0, 8))
+            widgets["hold_ms"] = hold_e
+            ctk.CTkLabel(
+                parent,
+                text="(útil para emuladores como Citra)",
+                text_color=("gray50", "gray55"),
+                font=ctk.CTkFont(size=11),
+            ).pack(side="left")
+
     def _extract_step(self, entry: dict) -> dict:
         action = _LABEL_TO_ACTION.get(entry["action_var"].get(), "click_left")
         step: dict = {"action": action}
@@ -1096,6 +1171,11 @@ class SequenceDialog:
         elif action in ("scroll_up", "scroll_down"):
             try:    step["clicks"] = int(w["clicks"].get() or 3)
             except ValueError: step["clicks"] = 3
+        elif action in ("click_left", "click_right", "click_middle", "double_click"):
+            try:
+                step["hold_ms"] = max(0, int(w["hold_ms"].get() or 0))
+            except (ValueError, KeyError):
+                step["hold_ms"] = 100
         return step
 
     def _move_step(self, entry: dict, direction: int) -> None:
