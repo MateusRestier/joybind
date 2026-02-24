@@ -68,7 +68,7 @@ def _default_sticks() -> list[dict]:
     """Configuração padrão para os dois analógicos (pré-mapeados para mouse)."""
     return [
         {
-            "label": "Esquerdo", "axis_x": 0, "axis_y": 1, "deadzone": 0.15,
+            "label": "Analógico Esquerdo", "axis_x": 0, "axis_y": 1, "deadzone": 0.15,
             "sensitivity": 600.0,
             "up":    {"type": "mouse_y", "sensitivity": 600},
             "down":  {"type": "mouse_y", "sensitivity": 600},
@@ -76,7 +76,7 @@ def _default_sticks() -> list[dict]:
             "right": {"type": "mouse_x", "sensitivity": 600},
         },
         {
-            "label": "Direito", "axis_x": 2, "axis_y": 3, "deadzone": 0.15,
+            "label": "Analógico Direito", "axis_x": 2, "axis_y": 3, "deadzone": 0.15,
             "sensitivity": 10000.0,
             "up":    {"type": "none"},
             "down":  {"type": "none"},
@@ -915,6 +915,8 @@ class App:
             return f'\u25b6 {n} passo{"s" if n != 1 else ""}'
         if t == "mouse_combo":
             return "\U0001f5b1 mouse"
+        if t == "none":
+            return "mapeado"
         return "—"
 
     def _on_btn_tile_click(self, vid: str) -> None:
@@ -928,7 +930,17 @@ class App:
             existing_keys=[k for k in self.cfg["binds"] if k != btn_key],
         )
         self.root.wait_window(dlg.dialog)
-        if dlg.result:
+        if dlg.clear_result:
+            # Remove ação + mapeamento do botão do controle
+            if btn_key and btn_key in self.cfg["binds"]:
+                del self.cfg["binds"][btn_key]
+            if vid in self._layout:
+                del self._layout[vid]
+            self._settings["btn_layout"] = dict(self._layout)
+            presets.save_settings(self._settings)
+            self._update_btn_tiles()
+            self._save_current_preset()
+        elif dlg.result:
             new_key = dlg.result["button"]
             if btn_key and btn_key in self.cfg["binds"] and btn_key != new_key:
                 del self.cfg["binds"][btn_key]
@@ -988,7 +1000,10 @@ class App:
 
     def _build_stick_panel(self, parent: ctk.CTkFrame, stick_idx: int, stick_cfg: dict) -> dict:
         """Cria o conteúdo de um painel de analógico e retorna referências."""
-        label    = stick_cfg.get("label", f"Analógico {stick_idx + 1}")
+        _raw_label = stick_cfg.get("label", f"Analógico {stick_idx + 1}")
+        # Normaliza labels de presets antigos ("Esquerdo" → "Analógico Esquerdo")
+        _label_map = {"Esquerdo": "Analógico Esquerdo", "Direito": "Analógico Direito"}
+        label = _label_map.get(_raw_label, _raw_label)
         defaults = _default_sticks()
 
         parent.grid_columnconfigure(0, weight=1)
@@ -1195,7 +1210,7 @@ class App:
 
     def _collect_analog_config(self) -> dict:
         sticks  = []
-        labels  = ["Esquerdo", "Direito"]
+        labels  = ["Analógico Esquerdo", "Analógico Direito"]
         defs    = _default_sticks()
 
         for i, panel in enumerate(self._stick_panels):
