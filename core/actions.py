@@ -34,15 +34,116 @@ if sys.platform == "win32":
             ("mi",   _MOUSEINPUT),
         ]
 
-    _INPUT_MOUSE      = 0
-    _MOUSEEVENTF_MOVE = 0x0001
+    class _POINT(ctypes.Structure):
+        _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
 
-    def _win_send_mouse_move(dx: int, dy: int) -> None:
+    _INPUT_MOUSE = 0
+
+    # ── Flags SendInput ───────────────────────────────────────────────────
+    _MOUSEEVENTF_MOVE        = 0x0001
+    _MOUSEEVENTF_LEFTDOWN    = 0x0002
+    _MOUSEEVENTF_LEFTUP      = 0x0004
+    _MOUSEEVENTF_RIGHTDOWN   = 0x0008
+    _MOUSEEVENTF_RIGHTUP     = 0x0010
+    _MOUSEEVENTF_MIDDLEDOWN  = 0x0020
+    _MOUSEEVENTF_MIDDLEUP    = 0x0040
+    _MOUSEEVENTF_ABSOLUTE    = 0x8000
+    _MOUSEEVENTF_VIRTUALDESK = 0x4000
+
+    # ── Mensagens Win32 ───────────────────────────────────────────────────
+    _WM_MOUSEMOVE     = 0x0200
+    _WM_LBUTTONDOWN   = 0x0201
+    _WM_LBUTTONUP     = 0x0202
+    _WM_LBUTTONDBLCLK = 0x0203
+    _WM_RBUTTONDOWN   = 0x0204
+    _WM_RBUTTONUP     = 0x0205
+    _WM_MBUTTONDOWN   = 0x0207
+    _WM_MBUTTONUP     = 0x0208
+    _MK_LBUTTON = 0x0001
+    _MK_RBUTTON = 0x0002
+    _MK_MBUTTON = 0x0010
+
+    # GetSystemMetrics IDs
+    _SM_XVIRTUALSCREEN  = 76
+    _SM_YVIRTUALSCREEN  = 77
+    _SM_CXVIRTUALSCREEN = 78
+    _SM_CYVIRTUALSCREEN = 79
+
+    def _win_sendinput(flags: int, dx: int = 0, dy: int = 0) -> None:
+        """Envia um único evento de mouse via SendInput."""
         inp = _INPUT(type=_INPUT_MOUSE)
         inp.mi.dx      = dx
         inp.mi.dy      = dy
-        inp.mi.dwFlags = _MOUSEEVENTF_MOVE
+        inp.mi.dwFlags = flags
         ctypes.windll.user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
+
+    def _win_send_mouse_move(dx: int, dy: int) -> None:
+        """Movimento relativo — compatível com Raw Input (Minecraft, etc.)."""
+        _win_sendinput(_MOUSEEVENTF_MOVE, dx, dy)
+
+    def _win_send_move_abs(x: int, y: int) -> None:
+        """Move cursor via SendInput ABSOLUTE gerando WM_MOUSEMOVE.
+
+        Usa o desktop virtual completo para suportar múltiplos monitores.
+        Essencial para emuladores que rastreiam cursor via WM_MOUSEMOVE
+        (SetCursorPos é silencioso e não gera essa mensagem).
+        """
+        gm = ctypes.windll.user32.GetSystemMetrics
+        vx = gm(_SM_XVIRTUALSCREEN)
+        vy = gm(_SM_YVIRTUALSCREEN)
+        vw = max(gm(_SM_CXVIRTUALSCREEN), 1)
+        vh = max(gm(_SM_CYVIRTUALSCREEN), 1)
+        nx = (x - vx) * 65535 // (vw - 1) if vw > 1 else 0
+        ny = (y - vy) * 65535 // (vh - 1) if vh > 1 else 0
+        _win_sendinput(
+            _MOUSEEVENTF_MOVE | _MOUSEEVENTF_ABSOLUTE | _MOUSEEVENTF_VIRTUALDESK,
+            nx, ny,
+        )
+
+    def _win_send_click(button: str = "left", hold_ms: int = 0) -> None:
+        """Clique via SendInput sem coordenadas — usa posição atual do cursor.
+
+        Gera WM_INPUT + WM_LBUTTONDOWN corretamente. Mais limpo que
+        pyautogui.click() que re-normaliza coordenadas absolutas.
+        """
+        _btns = {
+            "left":   (_MOUSEEVENTF_LEFTDOWN,   _MOUSEEVENTF_LEFTUP),
+            "right":  (_MOUSEEVENTF_RIGHTDOWN,  _MOUSEEVENTF_RIGHTUP),
+            "middle": (_MOUSEEVENTF_MIDDLEDOWN, _MOUSEEVENTF_MIDDLEUP),
+        }
+        f_down, f_up = _btns.get(button, _btns["left"])
+        _win_sendinput(f_down)
+        if hold_ms > 0:
+            time.sleep(hold_ms / 1000.0)
+        _win_sendinput(f_up)
+
+    def _win_post_click(button: str = "left", hold_ms: int = 0) -> None:
+        """Envia WM_MOUSEMOVE + WM_BUTTON* via PostMessage ao HWND sob o cursor.
+
+        Não requer foco — contorna o 'focus click' de emuladores como o Citra.
+        Inclui WM_MOUSEMOVE antes do botão para apps que rastreiam posição
+        via mensagem (ex: Qt render widget do Citra).
+        """
+        if button == "right":
+            down_msg, up_msg, mk = _WM_RBUTTONDOWN, _WM_RBUTTONUP, _MK_RBUTTON
+        elif button == "middle":
+            down_msg, up_msg, mk = _WM_MBUTTONDOWN, _WM_MBUTTONUP, _MK_MBUTTON
+        elif button == "double":
+            down_msg, up_msg, mk = _WM_LBUTTONDBLCLK, _WM_LBUTTONUP, _MK_LBUTTON
+        else:
+            down_msg, up_msg, mk = _WM_LBUTTONDOWN, _WM_LBUTTONUP, _MK_LBUTTON
+
+        pt = _POINT()
+        ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+        hwnd = ctypes.windll.user32.WindowFromPoint(pt)
+        ctypes.windll.user32.ScreenToClient(hwnd, ctypes.byref(pt))
+        # MAKELPARAM(x, y): x nos 16 bits baixos, y nos 16 bits altos
+        lparam = ((pt.y & 0xFFFF) << 16) | (pt.x & 0xFFFF)
+        ctypes.windll.user32.PostMessageW(hwnd, _WM_MOUSEMOVE, 0, lparam)
+        ctypes.windll.user32.PostMessageW(hwnd, down_msg, mk, lparam)
+        if hold_ms > 0:
+            time.sleep(hold_ms / 1000.0)
+        ctypes.windll.user32.PostMessageW(hwnd, up_msg, 0, lparam)
 
     _HAS_SENDINPUT = True
 else:
@@ -121,19 +222,55 @@ def execute_sequence(steps: list[dict]) -> None:
                 # Se save_restore=True, salva posição atual antes de mover
                 if step.get("save_restore") and saved_pos is None:
                     saved_pos = pyautogui.position()
-                pyautogui.moveTo(step["x"], step["y"], duration=0)
+                x_t, y_t = step["x"], step["y"]
+                if _HAS_SENDINPUT:
+                    # SendInput(MOVE+ABS) gera WM_MOUSEMOVE — essencial para
+                    # emuladores (Citra/Qt) que rastreiam cursor via mensagem.
+                    _win_send_move_abs(x_t, y_t)
+                else:
+                    pyautogui.moveTo(x_t, y_t, duration=0)
 
             elif action == "click_left":
-                pyautogui.click(button="left")
+                hold_ms = step.get("hold_ms", 0)
+                if _HAS_SENDINPUT:
+                    if step.get("direct"):
+                        _win_post_click("left", hold_ms)
+                    else:
+                        _win_send_click("left", hold_ms)
+                else:
+                    pyautogui.click(button="left")
 
             elif action == "click_right":
-                pyautogui.click(button="right")
+                hold_ms = step.get("hold_ms", 0)
+                if _HAS_SENDINPUT:
+                    if step.get("direct"):
+                        _win_post_click("right", hold_ms)
+                    else:
+                        _win_send_click("right", hold_ms)
+                else:
+                    pyautogui.click(button="right")
 
             elif action == "click_middle":
-                pyautogui.click(button="middle")
+                hold_ms = step.get("hold_ms", 0)
+                if _HAS_SENDINPUT:
+                    if step.get("direct"):
+                        _win_post_click("middle", hold_ms)
+                    else:
+                        _win_send_click("middle", hold_ms)
+                else:
+                    pyautogui.click(button="middle")
 
             elif action == "double_click":
-                pyautogui.doubleClick()
+                hold_ms = step.get("hold_ms", 0)
+                if _HAS_SENDINPUT:
+                    if step.get("direct"):
+                        _win_post_click("double", hold_ms)
+                    else:
+                        _win_send_click("left", hold_ms)
+                        time.sleep(0.05)
+                        _win_send_click("left", hold_ms)
+                else:
+                    pyautogui.doubleClick()
 
             elif action == "scroll_up":
                 pyautogui.scroll(step.get("clicks", 3))
