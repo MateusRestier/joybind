@@ -32,6 +32,7 @@ exe = EXE(
     a.datas,
     [],
     name='JoyBind',
+    icon='img/logo.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
