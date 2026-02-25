@@ -310,9 +310,37 @@ class BindDialog:
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
             command=lambda: self._capture_key_into(self._key_entry, self._capture_key_btn),
         )
-        self._capture_key_btn.grid(row=1, column=2, padx=(4, 12), pady=(6, 14))
+        self._capture_key_btn.grid(row=1, column=2, padx=(4, 12), pady=(6, 8))
 
-        # ── Linha 2: dica de nomes válidos ────────────────────────
+        # ── Linha 2: hold_ms ──────────────────────────────────────
+        hold_row = ctk.CTkFrame(self._kb_frame, fg_color="transparent")
+        hold_row.grid(row=2, column=0, columnspan=3, padx=12, pady=(0, 4), sticky="w")
+        ctk.CTkLabel(hold_row, text="Segurar (ms):").pack(side="left", padx=(0, 4))
+        self._kb_hold_entry = ctk.CTkEntry(hold_row, width=52, placeholder_text="0")
+        self._kb_hold_entry.insert(0, "50")
+        self._kb_hold_entry.pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(
+            hold_row,
+            text="(se tiver problemas em jogos, aumente este valor)",
+            font=ctk.CTkFont(size=11), text_color=("gray50", "gray55"),
+        ).pack(side="left")
+
+        # ── Linha 3: segurar enquanto pressionado ─────────────────
+        self._kb_hold_btn_var = ctk.BooleanVar(value=False)
+        hold_btn_row = ctk.CTkFrame(self._kb_frame, fg_color="transparent")
+        hold_btn_row.grid(row=3, column=0, columnspan=3, padx=12, pady=(0, 4), sticky="w")
+        ctk.CTkCheckBox(
+            hold_btn_row,
+            text="Segurar enquanto pressionado",
+            variable=self._kb_hold_btn_var,
+        ).pack(side="left")
+        ctk.CTkLabel(
+            hold_btn_row,
+            text="(mantém a tecla/botão do mouse pressionado enquanto o botão do controle estiver seguro)",
+            font=ctk.CTkFont(size=11), text_color=("gray50", "gray55"),
+        ).pack(side="left", padx=(8, 0))
+
+        # ── Linha 4: dica de nomes válidos ────────────────────────
         ctk.CTkLabel(
             self._kb_frame,
             text=(
@@ -321,7 +349,7 @@ class BindDialog:
             ),
             font=ctk.CTkFont(size=10), text_color=("gray50", "gray60"),
             wraplength=440, justify="left",
-        ).grid(row=2, column=0, columnspan=3, padx=12, pady=(0, 10), sticky="w")
+        ).grid(row=4, column=0, columnspan=3, padx=12, pady=(0, 10), sticky="w")
 
     def _on_suggestion_selected(self, label: str) -> None:
         """Preenche o campo de tecla com o valor da sugestão selecionada."""
@@ -545,6 +573,13 @@ class BindDialog:
             cap.configure(command=lambda en=e, b=cap: self._capture_key_into(en, b))
             cap.pack(side="left", padx=2)
 
+            ctk.CTkLabel(parent, text="ms:").pack(side="left", padx=(10, 2))
+            hold_e = ctk.CTkEntry(parent, width=46, placeholder_text="0")
+            hold_ms_val = step_data.get("hold_ms", 50)
+            hold_e.insert(0, str(hold_ms_val))
+            hold_e.pack(side="left")
+            widgets["hold_ms"] = hold_e
+
         elif action == "delay":
             e = ctk.CTkEntry(parent, width=70, placeholder_text="100")
             if "ms" in step_data:
@@ -591,6 +626,13 @@ class BindDialog:
 
         elif action == "key":
             step["key"] = w["key"].get().strip() or "enter"
+            if "hold_ms" in w:
+                try:
+                    v = max(0, int(w["hold_ms"].get() or 0))
+                    if v > 0:
+                        step["hold_ms"] = v
+                except ValueError:
+                    pass
 
         elif action == "delay":
             try:    step["ms"] = int(w["ms"].get() or 100)
@@ -846,6 +888,11 @@ class BindDialog:
         if bind_type == "keyboard":
             self._type_var.set("keyboard")
             self._key_entry.insert(0, bind.get("key", ""))
+            hold = bind.get("hold_ms", 0)
+            if hold > 0:
+                self._kb_hold_entry.delete(0, "end")
+                self._kb_hold_entry.insert(0, str(hold))
+            self._kb_hold_btn_var.set(bind.get("hold_while_pressed", False))
 
         elif bind_type == "sequence":
             self._type_var.set("sequence")
@@ -927,7 +974,15 @@ class BindDialog:
                         parent=self.dialog,
                     )
                     return
+            try:
+                hold_ms_kb = max(0, int(self._kb_hold_entry.get() or 0))
+            except ValueError:
+                hold_ms_kb = 0
             bind_data: dict = {"type": "keyboard", "key": key}
+            if hold_ms_kb > 0:
+                bind_data["hold_ms"] = hold_ms_kb
+            if self._kb_hold_btn_var.get():
+                bind_data["hold_while_pressed"] = True
 
         elif bind_type == "sequence":
             if not self._seq_steps:
@@ -1122,6 +1177,12 @@ class SequenceDialog:
                 fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"))
             cap.configure(command=lambda en=e, b=cap: self._capture_key(en, b))
             cap.pack(side="left", padx=2)
+            ctk.CTkLabel(parent, text="ms:").pack(side="left", padx=(10, 2))
+            hold_e = ctk.CTkEntry(parent, width=46, placeholder_text="0")
+            hold_ms_val = step_data.get("hold_ms", 50)
+            hold_e.insert(0, str(hold_ms_val))
+            hold_e.pack(side="left")
+            widgets["hold_ms"] = hold_e
 
         elif action == "delay":
             e = ctk.CTkEntry(parent, width=70, placeholder_text="100")
@@ -1165,6 +1226,13 @@ class SequenceDialog:
             step["save_restore"] = bool(w.get("save_restore") and w["save_restore"].get())
         elif action == "key":
             step["key"] = w["key"].get().strip() or "enter"
+            if "hold_ms" in w:
+                try:
+                    v = max(0, int(w["hold_ms"].get() or 0))
+                    if v > 0:
+                        step["hold_ms"] = v
+                except ValueError:
+                    pass
         elif action == "delay":
             try:    step["ms"] = int(w["ms"].get() or 100)
             except ValueError: step["ms"] = 100

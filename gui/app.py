@@ -571,6 +571,8 @@ class App:
         self._acc_sv: float = 0.0
         self._acc_sh: float = 0.0
         self._held_keys: set[str] = set()
+        # Botões com 'Segurar enquanto pressionado' ativos: button_int → key_str
+        self._held_btn_keys: dict[int, str] = {}
         # Estado anterior de ativação por direção — para edge-trigger
         # Chave: (stick_index, direction_str)
         self._prev_dir_active: dict[tuple, bool] = {}
@@ -583,6 +585,7 @@ class App:
         self.listener = ControllerListener(
             on_button_press=self._on_button_press,
             on_axes_update=self._on_axes_update,
+            on_button_release=self._on_button_release,
         )
 
         self._build_ui()
@@ -1414,6 +1417,12 @@ class App:
             except Exception:
                 pass
         self._held_keys.clear()
+        for key in list(self._held_btn_keys.values()):
+            try:
+                actions.hold_up(key)
+            except Exception:
+                pass
+        self._held_btn_keys.clear()
 
     # ──────────────────────────────────────────────────────────────
     # Gerenciamento de Presets
@@ -1595,8 +1604,13 @@ class App:
         def run() -> None:
             btype = bind["type"]
             if btype == "keyboard":
-                actions.execute_keyboard(bind["key"])
-                label_text = f"BTN {button}  →  {bind['key']}"
+                if bind.get("hold_while_pressed"):
+                    actions.hold_down(bind["key"])
+                    self._held_btn_keys[button] = bind["key"]
+                    label_text = f"BTN {button}  →  ⬇ {bind['key']}"
+                else:
+                    actions.execute_keyboard(bind["key"], bind.get("hold_ms", 0))
+                    label_text = f"BTN {button}  →  {bind['key']}"
             elif btype == "sequence":
                 n = len(bind.get("steps", []))
                 actions.execute_sequence(bind["steps"])
@@ -1609,6 +1623,19 @@ class App:
             self.root.after(0, lambda t=label_text: self._last_action_label.configure(text=t))
 
         threading.Thread(target=run, daemon=True, name=f"Action-BTN{button}").start()
+
+    def _on_button_release(self, button: int) -> None:
+        key_name = self._held_btn_keys.pop(button, None)
+        if key_name is None:
+            return
+
+        def run() -> None:
+            actions.hold_up(key_name)
+            self.root.after(0, lambda: self._last_action_label.configure(
+                text=f"BTN {button}  →  ↑ {key_name}"
+            ))
+
+        threading.Thread(target=run, daemon=True, name=f"Release-BTN{button}").start()
 
     # (lista de binds e CRUD removidos — substituídos pelos tiles do layout visual)
 

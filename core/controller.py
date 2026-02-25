@@ -55,17 +55,21 @@ class ControllerListener:
         self,
         on_button_press: Callable[[int], None],
         on_axes_update: Optional[Callable[[list[float]], None]] = None,
+        on_button_release: Optional[Callable[[int], None]] = None,
     ) -> None:
         """
-        :param on_button_press: Chamado quando um botão é pressionado.
-                                Recebe o índice inteiro do botão.
-        :param on_axes_update:  Chamado a cada iteração de polling com a lista de
-                                valores de todos os eixos analógicos (float -1.0..1.0).
-                                Ambos os callbacks rodam na thread daemon do controller;
-                                nunca interaja diretamente com a GUI dentro deles.
+        :param on_button_press:   Chamado quando um botão é pressionado (borda de subida).
+                                  Recebe o índice inteiro do botão.
+        :param on_axes_update:    Chamado a cada iteração de polling com a lista de
+                                  valores de todos os eixos analógicos (float -1.0..1.0).
+        :param on_button_release: Chamado quando um botão é solto (borda de descida).
+                                  Recebe o índice inteiro do botão.
+                                  Todos os callbacks rodam na thread daemon do controller;
+                                  nunca interaja diretamente com a GUI dentro deles.
         """
         self.on_button_press = on_button_press
         self.on_axes_update = on_axes_update
+        self.on_button_release = on_button_release
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._joystick: Optional[pygame.joystick.Joystick] = None
@@ -215,9 +219,12 @@ class ControllerListener:
                     current = self._joystick.get_button(btn)
                     previous = prev_states.get(btn, 0)
 
-                    # Borda de subida: botão acabou de ser pressionado
                     if current == 1 and previous == 0:
+                        # Borda de subida: botão acabou de ser pressionado
                         self.on_button_press(btn)
+                    elif current == 0 and previous == 1 and self.on_button_release:
+                        # Borda de descida: botão acabou de ser solto
+                        self.on_button_release(btn)
 
                     prev_states[btn] = current
 
@@ -232,6 +239,8 @@ class ControllerListener:
                     previous = prev_states.get(-(axis_idx + 1), 0)  # chave negativa evita colisão
                     if current == 1 and previous == 0:
                         self.on_button_press(vbtn)
+                    elif current == 0 and previous == 1 and self.on_button_release:
+                        self.on_button_release(vbtn)
                     prev_states[-(axis_idx + 1)] = current
 
                 # Poll HAT switches (D-pad em controles PlayStation e similares).
@@ -246,6 +255,8 @@ class ControllerListener:
                         prev_active    = (prev_hat[0] == dx and prev_hat[1] == dy)
                         if current_active and not prev_active:
                             self.on_button_press(vbtn)
+                        elif not current_active and prev_active and self.on_button_release:
+                            self.on_button_release(vbtn)
                     prev_hat_states[hat_idx] = (hx, hy)
 
                 # Envia estado atual de todos os eixos analógicos

@@ -152,22 +152,115 @@ else:
 
 # ── Ações simples ─────────────────────────────────────────────────────────────
 
-def execute_keyboard(key: str) -> None:
+def execute_keyboard(key: str, hold_ms: int = 0) -> None:
     """Pressiona e solta uma tecla ou executa um clique de mouse.
-    Ex: 'enter', 'space', 'f5', 'ctrl', 'mouse_left', 'mouse_right'."""
+
+    Ex: 'enter', 'space', 'f5', 'ctrl+c', 'mouse_left', 'mouse_right'.
+
+    hold_ms — tempo em ms que a tecla fica pressionada antes de soltar.
+    Útil para jogos que usam polling de estado por frame (ex: Minecraft/GLFW),
+    onde DOWN+UP instantâneos podem ser ignorados entre dois glfwPollEvents().
+    """
     try:
         if key == "mouse_left":
-            pyautogui.click(button="left")
+            if _HAS_SENDINPUT:
+                _win_send_click("left", hold_ms)
+            else:
+                pyautogui.click(button="left")
         elif key == "mouse_right":
-            pyautogui.click(button="right")
+            if _HAS_SENDINPUT:
+                _win_send_click("right", hold_ms)
+            else:
+                pyautogui.click(button="right")
         elif key == "mouse_middle":
-            pyautogui.click(button="middle")
+            if _HAS_SENDINPUT:
+                _win_send_click("middle", hold_ms)
+            else:
+                pyautogui.click(button="middle")
+        elif "+" in key:
+            # Combo como "ctrl+c": pressiona todas as partes, aguarda, solta na ordem inversa.
+            parts = [p.strip() for p in key.split("+") if p.strip()]
+            for p in parts:
+                pyautogui.keyDown(p)
+            if hold_ms > 0:
+                time.sleep(hold_ms / 1000.0)
+            for p in reversed(parts):
+                pyautogui.keyUp(p)
         else:
-            pyautogui.press(key)
+            if hold_ms > 0:
+                pyautogui.keyDown(key)
+                time.sleep(hold_ms / 1000.0)
+                pyautogui.keyUp(key)
+            else:
+                pyautogui.press(key)
     except pyautogui.FailSafeException:
         pass
     except Exception as e:
         print(f"[Actions] Erro ao executar '{key}': {e}")
+
+
+def hold_down(key: str) -> None:
+    """Pressiona e mantém uma tecla ou botão do mouse sem soltar.
+
+    Usado para binds de botão com 'Segurar enquanto pressionado':
+    chamado no press do botão do controle; hold_up() é chamado no release.
+    """
+    try:
+        if key == "mouse_left":
+            if _HAS_SENDINPUT:
+                _win_sendinput(_MOUSEEVENTF_LEFTDOWN)
+            else:
+                pyautogui.mouseDown(button="left")
+        elif key == "mouse_right":
+            if _HAS_SENDINPUT:
+                _win_sendinput(_MOUSEEVENTF_RIGHTDOWN)
+            else:
+                pyautogui.mouseDown(button="right")
+        elif key == "mouse_middle":
+            if _HAS_SENDINPUT:
+                _win_sendinput(_MOUSEEVENTF_MIDDLEDOWN)
+            else:
+                pyautogui.mouseDown(button="middle")
+        elif "+" in key:
+            parts = [p.strip() for p in key.split("+") if p.strip()]
+            for p in parts:
+                pyautogui.keyDown(p)
+        else:
+            pyautogui.keyDown(key)
+    except pyautogui.FailSafeException:
+        pass
+    except Exception as e:
+        print(f"[Actions] Erro ao pressionar (hold) '{key}': {e}")
+
+
+def hold_up(key: str) -> None:
+    """Solta uma tecla ou botão do mouse mantido por hold_down."""
+    try:
+        if key == "mouse_left":
+            if _HAS_SENDINPUT:
+                _win_sendinput(_MOUSEEVENTF_LEFTUP)
+            else:
+                pyautogui.mouseUp(button="left")
+        elif key == "mouse_right":
+            if _HAS_SENDINPUT:
+                _win_sendinput(_MOUSEEVENTF_RIGHTUP)
+            else:
+                pyautogui.mouseUp(button="right")
+        elif key == "mouse_middle":
+            if _HAS_SENDINPUT:
+                _win_sendinput(_MOUSEEVENTF_MIDDLEUP)
+            else:
+                pyautogui.mouseUp(button="middle")
+        elif "+" in key:
+            parts = [p.strip() for p in key.split("+") if p.strip()]
+            for p in reversed(parts):
+                pyautogui.keyUp(p)
+        else:
+            pyautogui.keyUp(key)
+    except pyautogui.FailSafeException:
+        pass
+    except Exception as e:
+        print(f"[Actions] Erro ao soltar (hold) '{key}': {e}")
 
 
 def execute_mouse_combo(x: int, y: int) -> None:
@@ -279,7 +372,7 @@ def execute_sequence(steps: list[dict]) -> None:
                 pyautogui.scroll(-step.get("clicks", 3))
 
             elif action == "key":
-                pyautogui.press(step["key"])
+                execute_keyboard(step["key"], step.get("hold_ms", 0))
 
             elif action == "delay":
                 time.sleep(step.get("ms", 100) / 1000.0)
