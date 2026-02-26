@@ -18,10 +18,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 - Tile exibia `"mapeado"` ao salvar um bind com tipo "Nenhuma" — agora exibe `"—"` consistentemente.
 
 ### Documentação
-- README reescrito como landing page para usuários: screenshot da interface, botão de download em destaque, seção de casos de uso (Minecraft, emuladores, GOW2, navegação no PC).
+- README reescrito como landing page: screenshot da interface, botão de download em destaque, seção de casos de uso (Minecraft, emuladores, GOW2, navegação no PC), tabela de ícones dos tiles.
 - `docs/ARCHITECTURE.md` criado: documentação técnica de cada arquivo, fluxo de uma ação do botão ao OS, decisões de design, camada Win32, sub-pixel accumulation, arquitetura de threads.
-- `docs/CONTRIBUTING.md` atualizado com novos campos de bind e seção "Como adicionar um novo botão/tecla de mouse".
-- `CHANGELOG.md` criado.
+- `docs/CONTRIBUTING.md` atualizado: novos campos de bind (`hold_while_pressed`, `macro_interval_ms`), tabela de teclas de mouse válidas, seção "Como adicionar um novo botão/tecla de mouse", diagrama de threads atualizado.
+- `CHANGELOG.md` criado com histórico baseado nas tags reais do repositório.
+
+### Commits
+- `1b01082` feat: scroll/mouse4/mouse5 como bind, modo macro e fix tile none
+- `27017ad` docs: landing page, ARCHITECTURE.md, CONTRIBUTING atualizado, CHANGELOG
 
 ---
 
