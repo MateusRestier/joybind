@@ -573,6 +573,8 @@ class App:
         self._held_keys: set[str] = set()
         # Botões com 'Segurar enquanto pressionado' ativos: button_int → key_str
         self._held_btn_keys: dict[int, str] = {}
+        # Threads de macro em execução: button_int → threading.Event (stop)
+        self._macro_stop_events: dict[int, threading.Event] = {}
         # Estado anterior de ativação por direção — para edge-trigger
         # Chave: (stick_index, direction_str)
         self._prev_dir_active: dict[tuple, bool] = {}
@@ -912,14 +914,19 @@ class App:
         t = bind.get("type", "none")
         if t == "keyboard":
             key = bind.get("key", "")
-            return self._MOUSE_KEY_DISPLAY.get(key, f'\u2328 {key}')
+            base = self._MOUSE_KEY_DISPLAY.get(key, f'\u2328 {key}')
+            if bind.get("macro_interval_ms"):
+                base = f"⟳ {base}"
+            elif bind.get("hold_while_pressed"):
+                base = f"⬇ {base}"
+            return base
         if t == "sequence":
             n = len(bind.get("steps", []))
             return f'\u25b6 {n} passo{"s" if n != 1 else ""}'
         if t == "mouse_combo":
             return "\U0001f5b1 mouse"
         if t == "none":
-            return "mapeado"
+            return "—"
         return "—"
 
     def _on_btn_tile_click(self, vid: str) -> None:
@@ -1423,6 +1430,12 @@ class App:
             except Exception:
                 pass
         self._held_btn_keys.clear()
+        for evt in list(self._macro_stop_events.values()):
+            try:
+                evt.set()
+            except Exception:
+                pass
+        self._macro_stop_events.clear()
 
     # ──────────────────────────────────────────────────────────────
     # Gerenciamento de Presets
@@ -1604,7 +1617,27 @@ class App:
         def run() -> None:
             btype = bind["type"]
             if btype == "keyboard":
-                if bind.get("hold_while_pressed"):
+                macro_ms = bind.get("macro_interval_ms", 0)
+                if macro_ms > 0:
+                    stop_evt = threading.Event()
+                    self._macro_stop_events[button] = stop_evt
+                    key_name = bind["key"]
+                    label_text = f"BTN {button}  →  ⟳ {key_name} ({macro_ms}ms)"
+                    self.root.after(0, lambda t=label_text: self._last_action_label.configure(text=t))
+
+                    def macro_loop(k: str, interval_ms: int, stop: threading.Event) -> None:
+                        while not stop.is_set():
+                            actions.execute_keyboard(k, bind.get("hold_ms", 0))
+                            stop.wait(interval_ms / 1000.0)
+
+                    threading.Thread(
+                        target=macro_loop,
+                        args=(key_name, macro_ms, stop_evt),
+                        daemon=True,
+                        name=f"Macro-BTN{button}",
+                    ).start()
+                    return
+                elif bind.get("hold_while_pressed"):
                     actions.hold_down(bind["key"])
                     self._held_btn_keys[button] = bind["key"]
                     label_text = f"BTN {button}  →  ⬇ {bind['key']}"
@@ -1625,6 +1658,11 @@ class App:
         threading.Thread(target=run, daemon=True, name=f"Action-BTN{button}").start()
 
     def _on_button_release(self, button: int) -> None:
+        # Para macro em loop se existir
+        stop_evt = self._macro_stop_events.pop(button, None)
+        if stop_evt is not None:
+            stop_evt.set()
+
         key_name = self._held_btn_keys.pop(button, None)
         if key_name is None:
             return

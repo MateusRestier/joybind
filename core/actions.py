@@ -47,8 +47,14 @@ if sys.platform == "win32":
     _MOUSEEVENTF_RIGHTUP     = 0x0010
     _MOUSEEVENTF_MIDDLEDOWN  = 0x0020
     _MOUSEEVENTF_MIDDLEUP    = 0x0040
+    _MOUSEEVENTF_WHEEL       = 0x0800  # roda vertical
+    _MOUSEEVENTF_XDOWN       = 0x0080  # botões laterais (mouse4/mouse5)
+    _MOUSEEVENTF_XUP         = 0x0100
     _MOUSEEVENTF_ABSOLUTE    = 0x8000
     _MOUSEEVENTF_VIRTUALDESK = 0x4000
+    _WHEEL_DELTA             = 120     # 1 "clique" de roda
+    _XBUTTON1                = 1       # mouse4 (botão traseiro)
+    _XBUTTON2                = 2       # mouse5 (botão frontal)
 
     # ── Mensagens Win32 ───────────────────────────────────────────────────
     _WM_MOUSEMOVE     = 0x0200
@@ -80,6 +86,20 @@ if sys.platform == "win32":
     def _win_send_mouse_move(dx: int, dy: int) -> None:
         """Movimento relativo — compatível com Raw Input (Minecraft, etc.)."""
         _win_sendinput(_MOUSEEVENTF_MOVE, dx, dy)
+
+    def _win_scroll(delta: int) -> None:
+        """Rola a roda do mouse via SendInput. delta positivo = cima, negativo = baixo."""
+        inp = _INPUT(type=_INPUT_MOUSE)
+        inp.mi.dwFlags   = _MOUSEEVENTF_WHEEL
+        inp.mi.mouseData = ctypes.c_ulong(delta & 0xFFFFFFFF)
+        ctypes.windll.user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
+
+    def _win_xbutton(which: int, down: bool) -> None:
+        """Pressiona/solta mouse4 (which=1) ou mouse5 (which=2) via SendInput."""
+        inp = _INPUT(type=_INPUT_MOUSE)
+        inp.mi.dwFlags   = _MOUSEEVENTF_XDOWN if down else _MOUSEEVENTF_XUP
+        inp.mi.mouseData = ctypes.c_ulong(which)
+        ctypes.windll.user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
 
     def _win_send_move_abs(x: int, y: int) -> None:
         """Move cursor via SendInput ABSOLUTE gerando WM_MOUSEMOVE.
@@ -162,7 +182,33 @@ def execute_keyboard(key: str, hold_ms: int = 0) -> None:
     onde DOWN+UP instantâneos podem ser ignorados entre dois glfwPollEvents().
     """
     try:
-        if key == "mouse_left":
+        if key == "scroll_up":
+            if _HAS_SENDINPUT:
+                _win_scroll(_WHEEL_DELTA)
+            else:
+                pyautogui.scroll(1)
+        elif key == "scroll_down":
+            if _HAS_SENDINPUT:
+                _win_scroll(-_WHEEL_DELTA)
+            else:
+                pyautogui.scroll(-1)
+        elif key == "mouse4":
+            if _HAS_SENDINPUT:
+                _win_xbutton(_XBUTTON1, True)
+                if hold_ms > 0:
+                    time.sleep(hold_ms / 1000.0)
+                _win_xbutton(_XBUTTON1, False)
+            else:
+                pyautogui.click(button="left")  # fallback
+        elif key == "mouse5":
+            if _HAS_SENDINPUT:
+                _win_xbutton(_XBUTTON2, True)
+                if hold_ms > 0:
+                    time.sleep(hold_ms / 1000.0)
+                _win_xbutton(_XBUTTON2, False)
+            else:
+                pyautogui.click(button="right")  # fallback
+        elif key == "mouse_left":
             if _HAS_SENDINPUT:
                 _win_send_click("left", hold_ms)
             else:
@@ -206,7 +252,20 @@ def hold_down(key: str) -> None:
     chamado no press do botão do controle; hold_up() é chamado no release.
     """
     try:
-        if key == "mouse_left":
+        if key in ("scroll_up", "scroll_down"):
+            # scroll não tem estado "pressionado" — dispara uma vez
+            execute_keyboard(key)
+        elif key == "mouse4":
+            if _HAS_SENDINPUT:
+                _win_xbutton(_XBUTTON1, True)
+            else:
+                pyautogui.mouseDown(button="left")
+        elif key == "mouse5":
+            if _HAS_SENDINPUT:
+                _win_xbutton(_XBUTTON2, True)
+            else:
+                pyautogui.mouseDown(button="right")
+        elif key == "mouse_left":
             if _HAS_SENDINPUT:
                 _win_sendinput(_MOUSEEVENTF_LEFTDOWN)
             else:
@@ -236,7 +295,19 @@ def hold_down(key: str) -> None:
 def hold_up(key: str) -> None:
     """Solta uma tecla ou botão do mouse mantido por hold_down."""
     try:
-        if key == "mouse_left":
+        if key in ("scroll_up", "scroll_down"):
+            pass  # scroll não tem estado — nada a soltar
+        elif key == "mouse4":
+            if _HAS_SENDINPUT:
+                _win_xbutton(_XBUTTON1, False)
+            else:
+                pyautogui.mouseUp(button="left")
+        elif key == "mouse5":
+            if _HAS_SENDINPUT:
+                _win_xbutton(_XBUTTON2, False)
+            else:
+                pyautogui.mouseUp(button="right")
+        elif key == "mouse_left":
             if _HAS_SENDINPUT:
                 _win_sendinput(_MOUSEEVENTF_LEFTUP)
             else:

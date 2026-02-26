@@ -23,7 +23,11 @@ from tkinter import messagebox
 
 # ── Teclas de mouse reconhecidas no painel de ação simples ───────────────────
 
-_MOUSE_KEYS: frozenset[str] = frozenset({"mouse_left", "mouse_right", "mouse_middle"})
+_MOUSE_KEYS: frozenset[str] = frozenset({
+    "mouse_left", "mouse_right", "mouse_middle",
+    "mouse4", "mouse5",
+    "scroll_up", "scroll_down",
+})
 
 _MOUSE_BTN_NAMES: dict = {}  # preenchido após import pynput (lazy)
 
@@ -35,6 +39,11 @@ _KB_SUGGESTIONS: list[tuple[str, str]] = [
     ("🖱 Clique Esquerdo",      "mouse_left"),
     ("🖱 Clique Direito",       "mouse_right"),
     ("🖱 Clique do Meio",       "mouse_middle"),
+    ("🖱 Mouse 4 (lateral tras.)", "mouse4"),
+    ("🖱 Mouse 5 (lateral front.)", "mouse5"),
+    # Scroll
+    ("🖱 Scroll para Cima",     "scroll_up"),
+    ("🖱 Scroll para Baixo",    "scroll_down"),
     # Teclas comuns
     ("↵ Enter",                 "enter"),
     ("␣ Espaço",                "space"),
@@ -340,16 +349,39 @@ class BindDialog:
             font=ctk.CTkFont(size=11), text_color=("gray50", "gray55"),
         ).pack(side="left", padx=(8, 0))
 
-        # ── Linha 4: dica de nomes válidos ────────────────────────
+        # ── Linha 4: modo macro (auto-click) ─────────────────────
+        self._kb_macro_var = ctk.BooleanVar(value=False)
+        macro_row = ctk.CTkFrame(self._kb_frame, fg_color="transparent")
+        macro_row.grid(row=4, column=0, columnspan=3, padx=12, pady=(0, 4), sticky="w")
+        self._kb_macro_check = ctk.CTkCheckBox(
+            macro_row,
+            text="Modo Macro (auto-click)",
+            variable=self._kb_macro_var,
+            command=self._on_macro_toggle,
+        )
+        self._kb_macro_check.pack(side="left")
+        ctk.CTkLabel(macro_row, text="  intervalo:").pack(side="left")
+        self._kb_macro_ms_entry = ctk.CTkEntry(macro_row, width=52, placeholder_text="50")
+        self._kb_macro_ms_entry.insert(0, "50")
+        self._kb_macro_ms_entry.pack(side="left", padx=(4, 4))
+        ctk.CTkLabel(macro_row, text="ms").pack(side="left")
+        ctk.CTkLabel(
+            macro_row,
+            text="  (dispara repetidamente enquanto o botão estiver pressionado)",
+            font=ctk.CTkFont(size=11), text_color=("gray50", "gray55"),
+        ).pack(side="left", padx=(4, 0))
+        self._on_macro_toggle()  # estado inicial
+
+        # ── Linha 5: dica de nomes válidos ────────────────────────
         ctk.CTkLabel(
             self._kb_frame,
             text=(
                 "Nomes aceitos: enter · space · escape · tab · f1-f12 · a-z · 0-9"
-                " · ctrl · alt · shift · mouse_left · mouse_right ..."
+                " · ctrl · alt · shift · mouse_left · mouse_right · scroll_up · scroll_down · mouse4 · mouse5 ..."
             ),
             font=ctk.CTkFont(size=10), text_color=("gray50", "gray60"),
             wraplength=440, justify="left",
-        ).grid(row=4, column=0, columnspan=3, padx=12, pady=(0, 10), sticky="w")
+        ).grid(row=5, column=0, columnspan=3, padx=12, pady=(0, 10), sticky="w")
 
     def _on_suggestion_selected(self, label: str) -> None:
         """Preenche o campo de tecla com o valor da sugestão selecionada."""
@@ -359,6 +391,15 @@ class BindDialog:
             self._key_entry.insert(0, value)
         # Reseta o dropdown para o placeholder após a seleção
         self._sugg_var.set(_SUGG_LABELS[0])
+
+    def _on_macro_toggle(self) -> None:
+        """Habilita/desabilita o campo de intervalo e desativa 'segurar' quando macro está ativo."""
+        macro_on = self._kb_macro_var.get()
+        state = "normal" if macro_on else "disabled"
+        self._kb_macro_ms_entry.configure(state=state)
+        if macro_on:
+            # macro e hold_while_pressed são mutuamente exclusivos
+            self._kb_hold_btn_var.set(False)
 
     # ──────────────────────────────────────────────────────────────
     # PAINEL DE SEQUÊNCIA (TIMELINE)
@@ -724,11 +765,13 @@ class BindDialog:
             pynput_mouse.Button.left:   "mouse_left",
             pynput_mouse.Button.right:  "mouse_right",
             pynput_mouse.Button.middle: "mouse_middle",
+            pynput_mouse.Button.x1:     "mouse4",
+            pynput_mouse.Button.x2:     "mouse5",
         }
 
         def on_mouse_click(x, y, button, pressed):
             if pressed:
-                _do_capture(_mouse_map.get(button, "mouse_left"))
+                _do_capture(_mouse_map.get(button, str(button)))
 
         kb_lst    = pynput_kb.Listener(on_press=on_key_press, suppress=False)
         mouse_lst = pynput_mouse.Listener(on_click=on_mouse_click)
@@ -893,6 +936,13 @@ class BindDialog:
                 self._kb_hold_entry.delete(0, "end")
                 self._kb_hold_entry.insert(0, str(hold))
             self._kb_hold_btn_var.set(bind.get("hold_while_pressed", False))
+            macro_ms = bind.get("macro_interval_ms", 0)
+            if macro_ms > 0:
+                self._kb_macro_var.set(True)
+                self._kb_macro_ms_entry.configure(state="normal")
+                self._kb_macro_ms_entry.delete(0, "end")
+                self._kb_macro_ms_entry.insert(0, str(macro_ms))
+            self._on_macro_toggle()
 
         elif bind_type == "sequence":
             self._type_var.set("sequence")
@@ -981,7 +1031,13 @@ class BindDialog:
             bind_data: dict = {"type": "keyboard", "key": key}
             if hold_ms_kb > 0:
                 bind_data["hold_ms"] = hold_ms_kb
-            if self._kb_hold_btn_var.get():
+            if self._kb_macro_var.get():
+                try:
+                    macro_ms = max(1, int(self._kb_macro_ms_entry.get() or 50))
+                except ValueError:
+                    macro_ms = 50
+                bind_data["macro_interval_ms"] = macro_ms
+            elif self._kb_hold_btn_var.get():
                 bind_data["hold_while_pressed"] = True
 
         elif bind_type == "sequence":
