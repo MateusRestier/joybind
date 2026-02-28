@@ -6,26 +6,51 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
-## [Não lançado]
+## [v2.0.0] — 2026-02-28
+
+Primeiro lançamento estável — versão oficial não pré-release.
+
+Esta versão marca a maturidade do JoyBind: a interface ganhou novos controles de bind, o backend ficou compatível com emuladores exigentes, e surgiram dois modos de repetição automática independentes.
 
 ### Adicionado
-- **Scroll do mouse como bind de botão** — `scroll_up` e `scroll_down` podem ser mapeados diretamente a botões do controle (ex: trocar hotbar no Minecraft). Usa `SendInput` com `MOUSEEVENTF_WHEEL` (WHEEL_DELTA = 120).
-- **Mouse4 e Mouse5 (botões laterais)** — botões laterais do mouse mapeáveis via `MOUSEEVENTF_XDOWN/XUP`. Capturáveis no wizard via `pynput Button.x1` / `Button.x2`.
-- **Modo Macro (auto-click)** — ao manter o botão do controle pressionado, a ação dispara repetidamente no intervalo configurado em ms. Mutuamente exclusivo com "Segurar enquanto pressionado". Usa `threading.Event.wait()` para parada imediata ao soltar.
-- Tile do layout exibe prefixo `⟳` para binds em Modo Macro e `⬇` para "Segurar enquanto pressionado".
+
+- **Segurar enquanto pressionado** — mantém a tecla ou botão de mouse segurado enquanto o botão do controle estiver pressionado; solta automaticamente ao soltar o controle. Ideal para andar, mirar, ou qualquer ação contínua.
+- **Modo Macro (auto-click por tecla)** — ao segurar o botão do controle, a ação de teclado ou mouse dispara repetidamente no intervalo configurado (ms). Mutuamente exclusivo com "Segurar enquanto pressionado". Parada imediata ao soltar via `threading.Event`.
+- **Macro de Sequência** — sequências de ações também suportam modo macro: a sequência inteira repete em loop enquanto o botão do controle estiver pressionado. Checkbox + campo de intervalo no painel de sequência.
+- **Scroll do mouse como bind** — `scroll_up` e `scroll_down` mapeáveis a botões do controle via `SendInput MOUSEEVENTF_WHEEL`. Compatível com modo macro para scroll contínuo.
+- **Mouse4 e Mouse5 (botões laterais)** — botões laterais do mouse mapeáveis via `MOUSEEVENTF_XDOWN/XUP`; capturáveis no wizard "Capturar" via `pynput Button.x1/x2`.
+- **Captura de scroll no wizard** — `scroll_up` e `scroll_down` agora são detectados pelo botão "Capturar" via callback `on_scroll` do pynput (antes apenas cliques eram detectados).
+- **Tipo "Nenhuma"** — permite mapear um botão do controle sem vincular nenhuma ação; tile exibe `—` em vez de ficar vazio.
+- **Botão "Limpar" no BindDialog** — remove o bind e a entrada de layout do botão com um clique, sem precisar reconfigurar o preset inteiro.
+- **Botão "Mapear botão" no BindDialog** — captura o índice do botão físico do controle diretamente dentro da janela de bind, sem precisar sair para o wizard separado.
+- **Prefixos nos tiles** — `⟳` para Modo Macro, `⬇` para "Segurar enquanto pressionado", `—` para tipo "Nenhuma".
+- **Painel do controle** — nova imagem do painel traseiro do controle (`img/painel.png`).
+- **Labels dos analógicos** renomeados para "Analógico Esquerdo" e "Analógico Direito"; retrocompatibilidade automática com presets criados em versões anteriores.
 
 ### Corrigido
-- Tile exibia `"mapeado"` ao salvar um bind com tipo "Nenhuma" — agora exibe `"—"` consistentemente.
+
+- **Compatibilidade com emuladores** — cliques e movimentos de mouse agora usam `SendInput` com `WM_MOUSEMOVE` e `hold_ms` (padrão 50 ms); resolve input ignorado em emuladores Qt como Citra, RetroArch e outros que processam input a cada frame (~16 ms).
+- **Release de botão** — `on_button_release` implementado para botões digitais, gatilhos analógicos (L2/R2 via threshold) e HAT switches (D-pad); necessário para "Segurar enquanto pressionado" e parada de macros funcionarem corretamente.
+- **Tile "mapeado" para tipo Nenhuma** — tile agora exibe `"—"` corretamente (antes exibia `"mapeado"`).
+- **Botão "Limpar" remove entrada de layout** — antes removia apenas o bind do `binds` mas deixava a entrada em `layout`, causando inconsistência no `settings.json`.
 
 ### Documentação
-- README reescrito como landing page: screenshot da interface, botão de download em destaque, seção de casos de uso (Minecraft, emuladores, GOW2, navegação no PC), tabela de ícones dos tiles.
-- `docs/ARCHITECTURE.md` criado: documentação técnica de cada arquivo, fluxo de uma ação do botão ao OS, decisões de design, camada Win32, sub-pixel accumulation, arquitetura de threads.
-- `docs/CONTRIBUTING.md` atualizado: novos campos de bind (`hold_while_pressed`, `macro_interval_ms`), tabela de teclas de mouse válidas, seção "Como adicionar um novo botão/tecla de mouse", diagrama de threads atualizado.
-- `CHANGELOG.md` criado com histórico baseado nas tags reais do repositório.
+
+- README reescrito como landing page: screenshot da interface, botão de download em destaque, seção de casos de uso (Minecraft, emuladores, God of War 2, mouse4/mouse5, scroll, navegação no PC), tabela de ícones dos tiles.
+- `docs/ARCHITECTURE.md` criado — documentação técnica de cada módulo, fluxo completo de uma ação (botão → SendInput → Raw Input), camada Win32 detalhada, sub-pixel accumulation, arquitetura de threads com diagrama ASCII.
+- `docs/CONTRIBUTING.md` atualizado — tabela de campos opcionais de bind (`hold_while_pressed`, `macro_interval_ms`), tabela de teclas de mouse válidas, diagrama de threads atualizado, guia "Como adicionar um novo botão/tecla de mouse".
+- `CHANGELOG.md` criado com histórico completo baseado nas tags reais do repositório.
 
 ### Commits
+
+- `ba9f858` fix: SendInput com WM_MOUSEMOVE e hold_ms para compatibilidade com emuladores
+- `8f2daf3` feat: BindDialog com Limpar, Mapear botão, tipo Nenhuma e layout grid no footer
+- `ee3ee3f` fix: labels analógicos completos e suporte a clear_result e tipo none
+- `b2b2a20` feat: hold while pressed + on_button_release + img painel
 - `1b01082` feat: scroll/mouse4/mouse5 como bind, modo macro e fix tile none
 - `27017ad` docs: landing page, ARCHITECTURE.md, CONTRIBUTING atualizado, CHANGELOG
+- `a3fd5fe` docs(changelog): adiciona hashes dos commits ao [Não lançado]
+- `5fde5d1` feat: macro de sequência e captura de scroll no Capturar
 
 ---
 
