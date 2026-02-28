@@ -922,7 +922,10 @@ class App:
             return base
         if t == "sequence":
             n = len(bind.get("steps", []))
-            return f'\u25b6 {n} passo{"s" if n != 1 else ""}'
+            base = f'\u25b6 {n} passo{"s" if n != 1 else ""}'
+            if bind.get("macro_interval_ms"):
+                base = f"⟳ {base}"
+            return base
         if t == "mouse_combo":
             return "\U0001f5b1 mouse"
         if t == "none":
@@ -1646,6 +1649,25 @@ class App:
                     label_text = f"BTN {button}  →  {bind['key']}"
             elif btype == "sequence":
                 n = len(bind.get("steps", []))
+                macro_ms = bind.get("macro_interval_ms", 0)
+                if macro_ms > 0:
+                    stop_evt = threading.Event()
+                    self._macro_stop_events[button] = stop_evt
+                    label_text = f"BTN {button}  →  ⟳ sequência ({n} passo{'s' if n != 1 else ''}) ({macro_ms}ms)"
+                    self.root.after(0, lambda t=label_text: self._last_action_label.configure(text=t))
+
+                    def seq_macro_loop(steps: list, interval_ms: int, stop: threading.Event) -> None:
+                        while not stop.is_set():
+                            actions.execute_sequence(steps)
+                            stop.wait(interval_ms / 1000.0)
+
+                    threading.Thread(
+                        target=seq_macro_loop,
+                        args=(bind["steps"], macro_ms, stop_evt),
+                        daemon=True,
+                        name=f"Macro-BTN{button}",
+                    ).start()
+                    return
                 actions.execute_sequence(bind["steps"])
                 label_text = f"BTN {button}  →  sequência ({n} passo{'s' if n != 1 else ''})"
             elif btype == "mouse_combo":

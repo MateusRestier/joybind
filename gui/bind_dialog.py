@@ -401,6 +401,11 @@ class BindDialog:
             # macro e hold_while_pressed são mutuamente exclusivos
             self._kb_hold_btn_var.set(False)
 
+    def _on_seq_macro_toggle(self) -> None:
+        """Habilita/desabilita o campo de intervalo do macro de sequência."""
+        state = "normal" if self._seq_macro_var.get() else "disabled"
+        self._seq_macro_ms_entry.configure(state=state)
+
     # ──────────────────────────────────────────────────────────────
     # PAINEL DE SEQUÊNCIA (TIMELINE)
     # ──────────────────────────────────────────────────────────────
@@ -446,6 +451,28 @@ class BindDialog:
             add_bar, text="+ Adicionar Passo", width=140,
             command=self._add_seq_step,
         ).pack(side="left")
+
+        # ── Linha 2: modo macro da sequência ─────────────────────
+        self._seq_macro_var = ctk.BooleanVar(value=False)
+        seq_macro_row = ctk.CTkFrame(self._seq_frame, fg_color="transparent")
+        seq_macro_row.grid(row=2, column=0, sticky="ew", padx=0, pady=(0, 4))
+        ctk.CTkCheckBox(
+            seq_macro_row,
+            text="Modo Macro (repetir sequência)",
+            variable=self._seq_macro_var,
+            command=self._on_seq_macro_toggle,
+        ).pack(side="left")
+        ctk.CTkLabel(seq_macro_row, text="  intervalo:").pack(side="left")
+        self._seq_macro_ms_entry = ctk.CTkEntry(seq_macro_row, width=52, placeholder_text="500")
+        self._seq_macro_ms_entry.insert(0, "500")
+        self._seq_macro_ms_entry.pack(side="left", padx=(4, 4))
+        ctk.CTkLabel(seq_macro_row, text="ms").pack(side="left")
+        ctk.CTkLabel(
+            seq_macro_row,
+            text="  (repete a sequência enquanto o botão estiver pressionado)",
+            font=ctk.CTkFont(size=11), text_color=("gray50", "gray55"),
+        ).pack(side="left", padx=(4, 0))
+        self._on_seq_macro_toggle()  # estado inicial
 
     def _on_type_change(self) -> None:
         """Alterna entre os painéis de ação."""
@@ -773,8 +800,14 @@ class BindDialog:
             if pressed:
                 _do_capture(_mouse_map.get(button, str(button)))
 
+        def on_scroll(x, y, dx, dy):
+            if dy > 0:
+                _do_capture("scroll_up")
+            elif dy < 0:
+                _do_capture("scroll_down")
+
         kb_lst    = pynput_kb.Listener(on_press=on_key_press, suppress=False)
-        mouse_lst = pynput_mouse.Listener(on_click=on_mouse_click)
+        mouse_lst = pynput_mouse.Listener(on_click=on_mouse_click, on_scroll=on_scroll)
         kb_lst.daemon    = True
         mouse_lst.daemon = True
         listeners.extend([kb_lst, mouse_lst])
@@ -946,6 +979,13 @@ class BindDialog:
 
         elif bind_type == "sequence":
             self._type_var.set("sequence")
+            macro_ms = bind.get("macro_interval_ms", 0)
+            if macro_ms > 0:
+                self._seq_macro_var.set(True)
+                self._seq_macro_ms_entry.configure(state="normal")
+                self._seq_macro_ms_entry.delete(0, "end")
+                self._seq_macro_ms_entry.insert(0, str(macro_ms))
+            self._on_seq_macro_toggle()
             for step in bind.get("steps", []):
                 self._render_step(step)
 
@@ -1050,6 +1090,12 @@ class BindDialog:
                 return
             steps = [self._extract_step_data(e) for e in self._seq_steps]
             bind_data = {"type": "sequence", "steps": steps}
+            if self._seq_macro_var.get():
+                try:
+                    macro_ms = max(1, int(self._seq_macro_ms_entry.get() or 500))
+                except ValueError:
+                    macro_ms = 500
+                bind_data["macro_interval_ms"] = macro_ms
 
         elif bind_type == "none":
             bind_data = {"type": "none"}
