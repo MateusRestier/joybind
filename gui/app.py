@@ -27,6 +27,8 @@ from core import presets
 from core import actions
 from core.controller import ControllerListener
 from .bind_dialog import BindDialog, SequenceDialog
+import i18n
+from i18n import t, step_plural, analog_type_opts
 
 # ── Recursos ───────────────────────────────────────────────────────────────
 # Funciona tanto em desenvolvimento quanto em executável PyInstaller (onefile).
@@ -42,11 +44,12 @@ _COLOR_BTN_START_HOVER = "#27ae60"
 _COLOR_BTN_STOP        = "#e67e22"
 _COLOR_BTN_STOP_HOVER  = "#d35400"
 
-_TYPE_LABELS: dict[str, str] = {
-    "keyboard":    "TECLADO",
-    "sequence":    "SEQUÊNCIA",
-    "mouse_combo": "MOUSE",
-}
+def _type_labels() -> dict[str, str]:
+    return {
+        "keyboard":    t("type_keyboard"),
+        "sequence":    t("type_sequence"),
+        "mouse_combo": t("type_mouse"),
+    }
 _TYPE_COLORS: dict[str, str] = {
     "keyboard":    "#3498db",
     "sequence":    "#e67e22",
@@ -68,7 +71,7 @@ def _default_sticks() -> list[dict]:
     """Configuração padrão para os dois analógicos (pré-mapeados para mouse)."""
     return [
         {
-            "label": "Analógico Esquerdo", "axis_x": 0, "axis_y": 1, "deadzone": 0.15,
+            "label": t("sec_analog_left"), "axis_x": 0, "axis_y": 1, "deadzone": 0.15,
             "sensitivity": 600.0,
             "up":    {"type": "mouse_y", "sensitivity": 600},
             "down":  {"type": "mouse_y", "sensitivity": 600},
@@ -76,7 +79,7 @@ def _default_sticks() -> list[dict]:
             "right": {"type": "mouse_x", "sensitivity": 600},
         },
         {
-            "label": "Analógico Direito", "axis_x": 2, "axis_y": 3, "deadzone": 0.15,
+            "label": t("sec_analog_right"), "axis_x": 2, "axis_y": 3, "deadzone": 0.15,
             "sensitivity": 10000.0,
             "up":    {"type": "none"},
             "down":  {"type": "none"},
@@ -140,24 +143,17 @@ def _find_sens(stick: dict, target_types: tuple, fallback: float = 600.0) -> flo
 class AnalogDirectionDialog:
     """Dialog para configurar a ação de uma direção do analógico."""
 
-    _TYPE_OPTS: dict[str, str] = {
-        "none":     "— Nada",
-        "mouse_x":  "Mouse X (horizontal)",
-        "mouse_y":  "Mouse Y (vertical)",
-        "scroll_v": "Scroll ↑↓ (vertical)",
-        "scroll_h": "Scroll ←→ (horizontal)",
-        "key":      "Tecla (segurar ao pressionar)",
-        "sequence": "Sequência de ações (ao cruzar limite)",
-    }
-    _BY_LABEL: dict[str, str] = {v: k for k, v in _TYPE_OPTS.items()}
-
     def __init__(self, parent, direction_label: str, current: dict) -> None:
         self.result: dict | None = None
         self._capturing = False
         self._parent = parent
 
+        # Language-aware type options (computed fresh each time)
+        self._TYPE_OPTS = analog_type_opts()
+        self._BY_LABEL = {v: k for k, v in self._TYPE_OPTS.items()}
+
         self.dialog = ctk.CTkToplevel(parent)
-        self.dialog.title(f"Configurar — {direction_label}")
+        self.dialog.title(t("title_configure", label=direction_label))
         self.dialog.geometry("400x220")
         self.dialog.resizable(False, False)
         self.dialog.grab_set()
@@ -172,8 +168,8 @@ class AnalogDirectionDialog:
         # ── Tipo ──────────────────────────────────────────────────
         row_type = ctk.CTkFrame(self.dialog, fg_color="transparent")
         row_type.pack(fill="x", padx=20, pady=(16, 6))
-        ctk.CTkLabel(row_type, text="Tipo:", width=90, anchor="w").pack(side="left")
-        self._type_var = ctk.StringVar(value=self._TYPE_OPTS.get(cur_type, "— Nada"))
+        ctk.CTkLabel(row_type, text=t("lbl_type"), width=90, anchor="w").pack(side="left")
+        self._type_var = ctk.StringVar(value=self._TYPE_OPTS.get(cur_type, t("analog_none")))
         ctk.CTkOptionMenu(
             row_type, variable=self._type_var,
             values=list(self._TYPE_OPTS.values()),
@@ -191,11 +187,11 @@ class AnalogDirectionDialog:
         btn_row = ctk.CTkFrame(self.dialog, fg_color="transparent")
         btn_row.pack(pady=14)
         ctk.CTkButton(
-            btn_row, text="Cancelar", width=100,
+            btn_row, text=t("btn_cancel"), width=100,
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
             command=self.dialog.destroy,
         ).pack(side="left", padx=8)
-        ctk.CTkButton(btn_row, text="OK", width=100, command=self._on_ok).pack(side="left", padx=8)
+        ctk.CTkButton(btn_row, text=t("btn_ok"), width=100, command=self._on_ok).pack(side="left", padx=8)
 
         self.dialog.protocol("WM_DELETE_WINDOW", self.dialog.destroy)
 
@@ -208,7 +204,7 @@ class AnalogDirectionDialog:
         if type_key in ("mouse_x", "mouse_y", "scroll_v", "scroll_h"):
             row = ctk.CTkFrame(self._dyn, fg_color="transparent")
             row.pack(fill="x")
-            ctk.CTkLabel(row, text="Velocidade:", width=90, anchor="w").pack(side="left")
+            ctk.CTkLabel(row, text=t("lbl_speed"), width=90, anchor="w").pack(side="left")
             self._sens_entry = ctk.CTkEntry(row, width=80, justify="center")
             self._sens_entry.insert(0, self._cur_sens)
             self._sens_entry.pack(side="left")
@@ -221,28 +217,29 @@ class AnalogDirectionDialog:
         elif type_key == "key":
             row = ctk.CTkFrame(self._dyn, fg_color="transparent")
             row.pack(fill="x")
-            ctk.CTkLabel(row, text="Tecla:", width=90, anchor="w").pack(side="left")
+            ctk.CTkLabel(row, text=t("lbl_key"), width=90, anchor="w").pack(side="left")
             self._key_entry = ctk.CTkEntry(row, width=100, justify="center")
             self._key_entry.insert(0, self._cur_key)
             self._key_entry.pack(side="left", padx=(0, 8))
             ctk.CTkButton(
-                row, text="Capturar", width=80,
+                row, text=t("btn_capture"), width=80,
                 fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
                 command=self._capture_key,
             ).pack(side="left")
 
         elif type_key == "sequence":
             n = len(self._cur_steps)
+            s = "s" if n != 1 else ""
             lbl_text = (
-                f"{n} passo{'s' if n != 1 else ''} configurado{'s' if n != 1 else ''}."
-                if n else "Nenhuma ação configurada ainda."
+                t("msg_analog_steps_n", n=n, s=s)
+                if n else t("msg_analog_no_steps")
             )
             ctk.CTkLabel(
                 self._dyn, text=lbl_text,
                 font=ctk.CTkFont(size=11), text_color=("gray55", "gray55"),
             ).pack(pady=(6, 4))
             ctk.CTkButton(
-                self._dyn, text="Editar Sequência...", width=180,
+                self._dyn, text=t("btn_edit_seq"), width=180,
                 fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
                 command=self._open_sequence_editor,
             ).pack()
@@ -260,9 +257,10 @@ class AnalogDirectionDialog:
             for w in self._dyn.winfo_children():
                 if isinstance(w, ctk.CTkLabel):
                     n = len(self._cur_steps)
+                    s = "s" if n != 1 else ""
                     w.configure(text=(
-                        f"{n} passo{'s' if n != 1 else ''} configurado{'s' if n != 1 else ''}."
-                        if n else "Nenhuma ação configurada ainda."
+                        t("msg_analog_steps_n", n=n, s=s)
+                        if n else t("msg_analog_no_steps")
                     ))
                     break
 
@@ -271,7 +269,7 @@ class AnalogDirectionDialog:
             return
         self._capturing = True
         self._key_entry.delete(0, "end")
-        self._key_entry.insert(0, "Aguardando…")
+        self._key_entry.insert(0, t("status_waiting"))
 
         def _listen() -> None:
             # Mapeamento de nomes pynput → nome canônico do modificador
@@ -329,7 +327,7 @@ class AnalogDirectionDialog:
             self.result = {"type": type_key, "sensitivity": sens}
         elif type_key == "key":
             key = (self._key_entry.get().strip() if self._key_entry else "")
-            if not key or key == "Aguardando…":
+            if not key or key == t("status_waiting"):
                 self.result = {"type": "none"}
             else:
                 self.result = {"type": "key", "key": key}
@@ -369,7 +367,7 @@ class AutoMapWizard:
         self._capturing = False
 
         self.dialog = ctk.CTkToplevel(parent)
-        self.dialog.title("Auto-mapear Botões")
+        self.dialog.title(t("title_auto_map"))
         self.dialog.geometry("380x300")
         self.dialog.resizable(False, False)
         self.dialog.grab_set()
@@ -380,7 +378,7 @@ class AutoMapWizard:
 
         ctk.CTkLabel(
             self.dialog,
-            text="Pressione cada botão no controle quando solicitado.",
+            text=t("msg_automap_hint"),
             font=ctk.CTkFont(size=12),
             wraplength=340,
         ).grid(row=0, column=0, pady=(18, 4), padx=20)
@@ -406,12 +404,12 @@ class AutoMapWizard:
         btn_row = ctk.CTkFrame(self.dialog, fg_color="transparent")
         btn_row.grid(row=4, column=0, pady=20)
         ctk.CTkButton(
-            btn_row, text="Cancelar", width=100,
+            btn_row, text=t("btn_cancel"), width=100,
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
             command=self._on_cancel,
         ).pack(side="left", padx=6)
         self._skip_btn = ctk.CTkButton(
-            btn_row, text="Pular", width=80,
+            btn_row, text=t("btn_skip"), width=80,
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
             command=self._on_skip,
         )
@@ -430,11 +428,11 @@ class AutoMapWizard:
         vid = self._tiles[self._idx]
         current_key = self._layout.get(vid, vid)
         self._progress_lbl.configure(
-            text=f"Tile {self._idx + 1} de {len(self._tiles)}"
+            text=t("msg_automap_tile", idx=self._idx + 1, total=len(self._tiles))
         )
         self._tile_lbl.configure(text=vid)
         self._status_lbl.configure(
-            text=f"Aguardando... (atual: btn {current_key})",
+            text=t("msg_automap_waiting", btn=current_key),
             text_color=("gray50", "gray60"),
         )
         self._skip_btn.configure(state="normal")
@@ -448,7 +446,7 @@ class AutoMapWizard:
             if not pygame.joystick.get_init():
                 pygame.joystick.init()
             if pygame.joystick.get_count() == 0:
-                self.dialog.after(0, lambda: self._on_fail("Nenhum controle conectado."))
+                self.dialog.after(0, lambda: self._on_fail(t("msg_no_ctrl_connected")))
                 return
 
             joy = pygame.joystick.Joystick(0)
@@ -498,7 +496,7 @@ class AutoMapWizard:
             try: joy.quit()
             except Exception: pass
             if self._capturing:
-                self.dialog.after(0, lambda: self._on_fail("Tempo esgotado (15 s)."))
+                self.dialog.after(0, lambda: self._on_fail(t("msg_timeout_automap")))
         except Exception as exc:
             self.dialog.after(0, lambda e=str(exc): self._on_fail(e))
 
@@ -506,7 +504,7 @@ class AutoMapWizard:
         self._capturing = False
         self._layout[vid] = btn_key
         self._status_lbl.configure(
-            text=f"Detectado: botão {btn_key} ✓",
+            text=t("msg_automap_detected", btn=btn_key),
             text_color=("#2ecc71", "#2ecc71"),
         )
         self._skip_btn.configure(state="disabled")
@@ -515,7 +513,7 @@ class AutoMapWizard:
     def _on_fail(self, msg: str) -> None:
         self._capturing = False
         self._status_lbl.configure(
-            text=f"Falhou: {msg}", text_color=("#e74c3c", "#e74c3c"),
+            text=t("msg_automap_failed", msg=msg), text_color=("#e74c3c", "#e74c3c"),
         )
 
     def _next(self) -> None:
@@ -673,15 +671,38 @@ class App:
             font=ctk.CTkFont(size=24, weight="bold"), anchor="w",
         ).grid(row=0, column=col_text, padx=(8, 20) if col_text else 20, pady=(14, 2), sticky="w")
         ctk.CTkLabel(
-            frame, text="Mapeador de Controle  →  Teclado / Mouse",
+            frame, text=t("header_subtitle"),
             font=ctk.CTkFont(size=11), text_color=("gray55", "gray60"), anchor="w",
         ).grid(row=1, column=col_text, padx=(8, 20) if col_text else 20, pady=(0, 12), sticky="w")
+
+        # Language selector
+        _active_col   = ("#1f538d", "#1f6aa5")
+        _inactive_col = ("gray65", "gray30")
+        _active_hov   = ("#1a4a7a", "#1a5a8a")
+        _inactive_hov = ("gray55", "gray40")
+        lang_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        lang_frame.grid(row=0, column=col_text + 1, rowspan=2, padx=(0, 14), pady=10, sticky="e")
+        _cur = i18n._lang
+        ctk.CTkButton(
+            lang_frame, text="EN", width=36, height=26,
+            font=ctk.CTkFont(size=11, weight="bold" if _cur == "en" else "normal"),
+            fg_color=_active_col if _cur == "en" else _inactive_col,
+            hover_color=_active_hov if _cur == "en" else _inactive_hov,
+            command=lambda: self._on_lang_change("en"),
+        ).pack(pady=(0, 2))
+        ctk.CTkButton(
+            lang_frame, text="PT", width=36, height=26,
+            font=ctk.CTkFont(size=11, weight="bold" if _cur == "pt" else "normal"),
+            fg_color=_active_col if _cur == "pt" else _inactive_col,
+            hover_color=_active_hov if _cur == "pt" else _inactive_hov,
+            command=lambda: self._on_lang_change("pt"),
+        ).pack(pady=(2, 0))
 
     def _build_preset_bar(self) -> None:
         frame = ctk.CTkFrame(self.root)
         frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(8, 0))
         frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(frame, text="Preset:", font=ctk.CTkFont(weight="bold")).grid(
+        ctk.CTkLabel(frame, text=t("lbl_preset"), font=ctk.CTkFont(weight="bold")).grid(
             row=0, column=0, padx=(14, 8), pady=7,
         )
         self._preset_var = ctk.StringVar()
@@ -691,15 +712,15 @@ class App:
         )
         self._preset_combo.grid(row=0, column=1, padx=4, pady=7, sticky="ew")
         ctk.CTkButton(
-            frame, text="Novo", width=70, command=self._new_preset,
+            frame, text=t("btn_new"), width=70, command=self._new_preset,
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
         ).grid(row=0, column=2, padx=(4, 0), pady=7)
         ctk.CTkButton(
-            frame, text="Apagar", width=76, command=self._delete_current_preset,
+            frame, text=t("btn_delete"), width=76, command=self._delete_current_preset,
             fg_color=("#b33030", "#7a1f1f"), hover_color=("#8c2020", "#5c1010"),
         ).grid(row=0, column=3, padx=(4, 0), pady=7)
         ctk.CTkButton(
-            frame, text="Pasta...", width=80, command=self._change_presets_folder,
+            frame, text=t("btn_folder"), width=80, command=self._change_presets_folder,
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
         ).grid(row=0, column=4, padx=(4, 14), pady=7)
 
@@ -707,7 +728,7 @@ class App:
         frame = ctk.CTkFrame(self.root)
         frame.grid(row=2, column=0, sticky="ew", padx=12, pady=(6, 4))
         frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(frame, text="Controle:", font=ctk.CTkFont(weight="bold")).grid(
+        ctk.CTkLabel(frame, text=t("lbl_controller"), font=ctk.CTkFont(weight="bold")).grid(
             row=0, column=0, padx=(14, 8), pady=8,
         )
         self._joystick_var = ctk.StringVar()
@@ -726,13 +747,13 @@ class App:
         frame.grid(row=3, column=0, sticky="ew", padx=12, pady=2)
         frame.grid_columnconfigure(1, weight=1)
         self._toggle_btn = ctk.CTkButton(
-            frame, text="  Iniciar Escuta", width=170,
+            frame, text=t("btn_start_listen"), width=170,
             fg_color=_COLOR_BTN_START, hover_color=_COLOR_BTN_START_HOVER,
             command=self._toggle_listener,
         )
         self._toggle_btn.grid(row=0, column=0, padx=14, pady=12)
         self._status_label = ctk.CTkLabel(
-            frame, text="  Parado", text_color=_COLOR_STOPPED,
+            frame, text=t("status_stopped"), text_color=_COLOR_STOPPED,
             font=ctk.CTkFont(size=13, weight="bold"),
         )
         self._status_label.grid(row=0, column=1, padx=8, pady=12, sticky="w")
@@ -772,17 +793,17 @@ class App:
         toolbar = ctk.CTkFrame(scroll, fg_color="transparent")
         toolbar.pack(fill="x", padx=8, pady=(8, 0))
         ctk.CTkButton(
-            toolbar, text="Limpar Mapeamentos", width=160,
+            toolbar, text=t("btn_clear_binds"), width=160,
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
             command=self._on_clear_binds,
         ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
-            toolbar, text="Auto-mapear Botões", width=160,
+            toolbar, text=t("btn_auto_map"), width=160,
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
             command=self._on_auto_map,
         ).pack(side="left")
         ctk.CTkButton(
-            toolbar, text="Feedback", width=90,
+            toolbar, text=t("btn_feedback"), width=90,
             fg_color=("gray65", "gray30"), hover_color=("gray55", "gray40"),
             command=lambda: webbrowser.open(
                 "https://docs.google.com/forms/d/e/"
@@ -826,7 +847,7 @@ class App:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
         frame.grid(row=0, column=0, padx=4, pady=4, sticky="n")
         ctk.CTkLabel(
-            frame, text="D-Pad",
+            frame, text=t("sec_dpad"),
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=("gray55", "gray55"),
         ).pack(pady=(4, 2))
@@ -846,7 +867,7 @@ class App:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
         frame.grid(row=0, column=2, padx=4, pady=4, sticky="n")
         ctk.CTkLabel(
-            frame, text="Botões",
+            frame, text=t("sec_buttons"),
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=("gray55", "gray55"),
         ).pack(pady=(4, 2))
@@ -866,7 +887,7 @@ class App:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
         frame.grid(row=0, column=1, padx=4, pady=4, sticky="n")
         ctk.CTkLabel(
-            frame, text="Central",
+            frame, text=t("sec_central"),
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=("gray55", "gray55"),
         ).pack(pady=(4, 2))
@@ -898,11 +919,12 @@ class App:
         self._btn_tiles[visual_id] = btn
         return btn
 
-    _MOUSE_KEY_DISPLAY: dict[str, str] = {
-        "mouse_left":   "🖱 Esq.",
-        "mouse_right":  "🖱 Dir.",
-        "mouse_middle": "🖱 Meio",
-    }
+    def _mouse_key_display(self) -> dict[str, str]:
+        return {
+            "mouse_left":   t("mouse_display_left"),
+            "mouse_right":  t("mouse_display_right"),
+            "mouse_middle": t("mouse_display_middle"),
+        }
 
     def _btn_tile_text(self, btn_key: str | None) -> str:
         """Retorna texto resumido da binding atual para exibir no tile."""
@@ -914,7 +936,7 @@ class App:
         t = bind.get("type", "none")
         if t == "keyboard":
             key = bind.get("key", "")
-            base = self._MOUSE_KEY_DISPLAY.get(key, f'\u2328 {key}')
+            base = self._mouse_key_display().get(key, f'\u2328 {key}')
             if bind.get("macro_interval_ms"):
                 base = f"⟳ {base}"
             elif bind.get("hold_while_pressed"):
@@ -922,7 +944,7 @@ class App:
             return base
         if t == "sequence":
             n = len(bind.get("steps", []))
-            base = f'\u25b6 {n} passo{"s" if n != 1 else ""}'
+            base = f'\u25b6 {n} {step_plural(n)}'
             if bind.get("macro_interval_ms"):
                 base = f"⟳ {base}"
             return base
@@ -937,7 +959,7 @@ class App:
         existing = self.cfg["binds"].get(btn_key) if btn_key else None
         dlg = BindDialog(
             self.root,
-            title=f"Configurar — {vid}",
+            title=t("title_configure", label=vid),
             edit_key=btn_key,
             edit_bind=existing,
             existing_keys=[k for k in self.cfg["binds"] if k != btn_key],
@@ -975,8 +997,8 @@ class App:
     def _on_clear_binds(self) -> None:
         """Limpa todos os mapeamentos e reseta os números de botão para o padrão."""
         if messagebox.askyesno(
-            "Confirmar",
-            "Limpar todos os mapeamentos e restaurar os números de botão padrão?",
+            t("title_confirm"),
+            t("msg_clear_binds"),
             parent=self.root,
         ):
             self.cfg["binds"] = {}
@@ -1013,10 +1035,13 @@ class App:
 
     def _build_stick_panel(self, parent: ctk.CTkFrame, stick_idx: int, stick_cfg: dict) -> dict:
         """Cria o conteúdo de um painel de analógico e retorna referências."""
-        _raw_label = stick_cfg.get("label", f"Analógico {stick_idx + 1}")
-        # Normaliza labels de presets antigos ("Esquerdo" → "Analógico Esquerdo")
-        _label_map = {"Esquerdo": "Analógico Esquerdo", "Direito": "Analógico Direito"}
-        label = _label_map.get(_raw_label, _raw_label)
+        # Always use translated label based on index — ignores stored label for display
+        if stick_idx == 0:
+            label = t("sec_analog_left")
+        elif stick_idx == 1:
+            label = t("sec_analog_right")
+        else:
+            label = t("sec_analog_n", n=stick_idx + 1)
         defaults = _default_sticks()
 
         parent.grid_columnconfigure(0, weight=1)
@@ -1040,8 +1065,8 @@ class App:
 
         default_ax = defaults[stick_idx]["axis_x"] if stick_idx < len(defaults) else stick_idx * 2
         default_ay = defaults[stick_idx]["axis_y"] if stick_idx < len(defaults) else stick_idx * 2 + 1
-        axis_x_entry = _make_ax_entry("Eixo X:", stick_cfg.get("axis_x", default_ax))
-        axis_y_entry = _make_ax_entry("Eixo Y:", stick_cfg.get("axis_y", default_ay))
+        axis_x_entry = _make_ax_entry("X:", stick_cfg.get("axis_x", default_ax))
+        axis_y_entry = _make_ax_entry("Y:", stick_cfg.get("axis_y", default_ay))
 
         ctk.CTkLabel(ax_frame, text="DZ:", font=ctk.CTkFont(size=11)).pack(side="left", padx=(0, 2))
         dz_entry = ctk.CTkEntry(ax_frame, width=46, justify="center")
@@ -1097,7 +1122,7 @@ class App:
 
         # Dica
         ctk.CTkLabel(
-            parent, text="Clique em uma direção para configurar",
+            parent, text=t("msg_click_dir"),
             font=ctk.CTkFont(size=10), text_color=("gray55", "gray55"),
         ).pack(pady=(0, 4))
 
@@ -1106,13 +1131,13 @@ class App:
         # Direito:  "scroll"         | "game" (câmera/mouse)
         if stick_idx == 0:
             mode_opts = [
-                ("mouse", "🖱 Modo Mouse  (move o cursor)"),
-                ("game",  "🎮 Modo Jogo   (WASD automático)"),
+                ("mouse", t("mode_mouse")),
+                ("game",  t("mode_game_wasd")),
             ]
         else:
             mode_opts = [
-                ("scroll", "↕ Modo Scroll  (rolar página)"),
-                ("game",   "🎮 Modo Jogo   (câmera / mouse)"),
+                ("scroll", t("mode_scroll")),
+                ("game",   t("mode_game_cam")),
             ]
 
         init_mode = stick_cfg.get("stick_mode", "none")
@@ -1170,13 +1195,17 @@ class App:
             return
 
         dir_names = {
-            "up":    "↑ Cima",
-            "down":  "↓ Baixo",
-            "left":  "← Esquerda",
-            "right": "→ Direita",
+            "up":    t("dir_up"),
+            "down":  t("dir_down"),
+            "left":  t("dir_left"),
+            "right": t("dir_right"),
         }
-        stick_labels = ["Analógico Esquerdo", "Analógico Direito"]
-        stick_label  = stick_labels[stick_idx] if stick_idx < len(stick_labels) else f"Analógico {stick_idx+1}"
+        if stick_idx == 0:
+            stick_label = t("sec_analog_left")
+        elif stick_idx == 1:
+            stick_label = t("sec_analog_right")
+        else:
+            stick_label = t("sec_analog_n", n=stick_idx + 1)
 
         dlg = AnalogDirectionDialog(
             self.root,
@@ -1223,7 +1252,7 @@ class App:
 
     def _collect_analog_config(self) -> dict:
         sticks  = []
-        labels  = ["Analógico Esquerdo", "Analógico Direito"]
+        labels  = [t("sec_analog_left"), t("sec_analog_right")]
         defs    = _default_sticks()
 
         for i, panel in enumerate(self._stick_panels):
@@ -1248,7 +1277,7 @@ class App:
             except (ValueError, TypeError):
                 sens = default_sens
             sticks.append({
-                "label":       labels[i] if i < len(labels) else f"Analógico {i+1}",
+                "label":       labels[i] if i < len(labels) else t("sec_analog_n", n=i + 1),
                 "axis_x":      ax,
                 "axis_y":      ay,
                 "deadzone":    dz,
@@ -1474,17 +1503,17 @@ class App:
         self._render_analog_config()
 
     def _new_preset(self) -> None:
-        dlg  = ctk.CTkInputDialog(text="Nome do novo preset:", title="Novo Preset")
+        dlg  = ctk.CTkInputDialog(text=t("msg_preset_new_text"), title=t("title_new_preset"))
         name = dlg.get_input()
         if not name:
             return
         safe = _sanitize_filename(name)
         if not safe:
-            messagebox.showerror("Nome inválido", "O nome contém apenas caracteres inválidos.", parent=self.root)
+            messagebox.showerror(t("title_err_name"), t("msg_invalid_name"), parent=self.root)
             return
         path = self._presets_dir / f"{safe}.json"
         if path.exists():
-            if not messagebox.askyesno("Preset já existe", f"Substituir '{safe}'?", parent=self.root):
+            if not messagebox.askyesno(t("title_err_preset_exists"), t("msg_preset_replace", name=safe), parent=self.root):
                 return
         cfg: dict = {"binds": {}, "analog": {"enabled": False, "sticks": _default_sticks()}}
         if presets.save_preset(path, cfg):
@@ -1502,8 +1531,8 @@ class App:
             return
         name = self._current_preset_path.stem
         if not messagebox.askyesno(
-            "Apagar preset",
-            f"Apagar o preset '{name}'?\n\nEsta ação não pode ser desfeita.",
+            t("title_delete_preset"),
+            t("msg_delete_preset", name=name),
             parent=self.root,
         ):
             return
@@ -1521,7 +1550,7 @@ class App:
 
     def _change_presets_folder(self) -> None:
         folder = filedialog.askdirectory(
-            title="Escolher pasta de presets",
+            title=t("title_folder"),
             initialdir=str(self._presets_dir), parent=self.root,
         )
         if not folder:
@@ -1562,8 +1591,8 @@ class App:
             self._joystick_combo.configure(values=names)
             self._joystick_var.set(names[0])
         else:
-            self._joystick_combo.configure(values=["Nenhum controle encontrado"])
-            self._joystick_var.set("Nenhum controle encontrado")
+            self._joystick_combo.configure(values=[t("status_no_ctrl")])
+            self._joystick_var.set(t("status_no_ctrl"))
 
     # ──────────────────────────────────────────────────────────────
     # Listener (Start / Stop)
@@ -1583,15 +1612,15 @@ class App:
 
         ok, err_msg = self.listener.start()
         if not ok:
-            messagebox.showerror("Erro ao iniciar", err_msg)
+            messagebox.showerror(t("title_err_start"), err_msg)
             return
 
         self._is_listening = True
         self._toggle_btn.configure(
-            text="  Pausar Escuta",
+            text=t("btn_stop_listen"),
             fg_color=_COLOR_BTN_STOP, hover_color=_COLOR_BTN_STOP_HOVER,
         )
-        self._status_label.configure(text="  Ativo", text_color=_COLOR_ACTIVE)
+        self._status_label.configure(text=t("status_active"), text_color=_COLOR_ACTIVE)
         self._refresh_btn.configure(state="disabled")
 
     def _stop_listener(self) -> None:
@@ -1601,10 +1630,10 @@ class App:
         self._prev_dir_active = {}
         self._release_all_held_keys()
         self._toggle_btn.configure(
-            text="  Iniciar Escuta",
+            text=t("btn_start_listen"),
             fg_color=_COLOR_BTN_START, hover_color=_COLOR_BTN_START_HOVER,
         )
-        self._status_label.configure(text="  Parado", text_color=_COLOR_STOPPED)
+        self._status_label.configure(text=t("status_stopped"), text_color=_COLOR_STOPPED)
         self._refresh_btn.configure(state="normal")
 
     # ──────────────────────────────────────────────────────────────
@@ -1653,7 +1682,7 @@ class App:
                 if macro_ms > 0:
                     stop_evt = threading.Event()
                     self._macro_stop_events[button] = stop_evt
-                    label_text = f"BTN {button}  →  ⟳ sequência ({n} passo{'s' if n != 1 else ''}) ({macro_ms}ms)"
+                    label_text = f"BTN {button}  →  ⟳ {t('word_sequence')} ({n} {step_plural(n)}) ({macro_ms}ms)"
                     self.root.after(0, lambda t=label_text: self._last_action_label.configure(text=t))
 
                     def seq_macro_loop(steps: list, interval_ms: int, stop: threading.Event) -> None:
@@ -1669,7 +1698,7 @@ class App:
                     ).start()
                     return
                 actions.execute_sequence(bind["steps"])
-                label_text = f"BTN {button}  →  sequência ({n} passo{'s' if n != 1 else ''})"
+                label_text = f"BTN {button}  →  {t('word_sequence')} ({n} {step_plural(n)})"
             elif btype == "mouse_combo":
                 actions.execute_mouse_combo(bind["x"], bind["y"])
                 label_text = f"BTN {button}  →  mouse ({bind['x']}, {bind['y']})"
@@ -1702,6 +1731,22 @@ class App:
     # ──────────────────────────────────────────────────────────────
     # Encerramento
     # ──────────────────────────────────────────────────────────────
+
+    def _on_lang_change(self, lang: str) -> None:
+        """Saves language preference and restarts the application."""
+        if i18n._lang == lang:
+            return  # Already active
+        import subprocess
+        import sys as _sys2
+        s = presets.load_settings()
+        s["language"] = lang
+        presets.save_settings(s)
+        if getattr(_sys2, "frozen", False):
+            subprocess.Popen([_sys2.executable])
+        else:
+            subprocess.Popen([_sys2.executable] + _sys2.argv)
+        self.shutdown()
+        self.root.destroy()
 
     def shutdown(self) -> None:
         try:

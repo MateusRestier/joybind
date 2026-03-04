@@ -14,6 +14,8 @@ import pygame
 import customtkinter as ctk
 from PIL import Image
 
+import i18n
+from core.presets import load_settings
 from gui.app import App
 
 # Caminho base funciona tanto em dev quanto em executável PyInstaller
@@ -43,10 +45,14 @@ def _apply_taskbar_icon(root: ctk.CTk, ico_path: str) -> None:
         ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon)  # WM_SETICON, ICON_BIG
         ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon)  # WM_SETICON, ICON_SMALL
     except Exception as e:
-        print(f"[Icon] Erro ao definir ícone na taskbar: {e}")
+        print(i18n.t("err_icon_taskbar", e=e))
 
 
 def main() -> None:
+    # ── Idioma ─────────────────────────────────────────────────────
+    _settings = load_settings()
+    i18n.set_lang(_settings.get("language", "en"))
+
     # ── Aparência do CustomTkinter ─────────────────────────────────
     ctk.set_appearance_mode("dark")          # "dark" | "light" | "system"
     ctk.set_default_color_theme("blue")      # "blue" | "green" | "dark-blue"
@@ -72,7 +78,7 @@ def main() -> None:
             root.iconbitmap(ico_str)                             # titlebar
             root.after(0, lambda: _apply_taskbar_icon(root, ico_str))  # taskbar
         except Exception as e:
-            print(f"[Icon] Erro ao definir ícone: {e}")
+            print(i18n.t("err_icon", e=e))
 
     app = App(root)
 

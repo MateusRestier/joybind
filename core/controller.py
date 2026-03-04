@@ -13,6 +13,7 @@ Design:
 import threading
 import pygame
 from typing import Callable, Optional
+import i18n
 
 # Threshold para considerar um eixo de gatilho como "pressionado".
 # Gatilhos PS geralmente vão de -1.0 (solto) a +1.0 (pressionado).
@@ -97,7 +98,7 @@ class ControllerListener:
             try:
                 names.append(pygame.joystick.Joystick(i).get_name())
             except pygame.error:
-                names.append(f"Controle #{i}")
+                names.append(i18n.t("ctrl_name_fallback", n=i))
         return names
 
     # ──────────────────────────────────────────────────────────────
@@ -146,18 +147,15 @@ class ControllerListener:
         total = pygame.joystick.get_count()
 
         if total == 0:
-            return False, "Nenhum controle detectado. Conecte um joystick/gamepad e tente novamente."
+            return False, i18n.t("msg_no_ctrl")
         if self._joystick_index >= total:
-            return False, (
-                f"Controle de índice {self._joystick_index} não encontrado "
-                f"(apenas {total} controle(s) conectado(s))."
-            )
+            return False, i18n.t("msg_ctrl_not_found", idx=self._joystick_index, total=total)
 
         try:
             self._joystick = pygame.joystick.Joystick(self._joystick_index)
             self._joystick.init()
         except pygame.error as exc:
-            return False, f"Erro ao inicializar controle: {exc}"
+            return False, i18n.t("msg_ctrl_init_error", exc=exc)
 
         self._running = True
         self._thread = threading.Thread(

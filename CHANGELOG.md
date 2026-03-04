@@ -6,6 +6,21 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [v2.1.0] — 2026-03-04
+
+### Adicionado
+
+- **Internacionalização (EN/PT)** — toda a interface do JoyBind foi traduzida para inglês. O idioma é selecionável diretamente no cabeçalho da janela por dois botões `[EN]` `[PT]`; a troca salva a preferência e reinicia o aplicativo automaticamente.
+- **Módulo `i18n.py`** — dicionários completos PT/EN com ~150 strings, função `t(key)` para tradução com suporte a formatação, funções auxiliares `kb_suggestions()`, `step_action_labels()` e `analog_type_opts()` para listas e dicionários sensíveis ao idioma.
+- **Preferência de idioma persistida** — salva como chave `"language"` no `settings.json` via `%APPDATA%\JoyBind\`; padrão: inglês (`"en"`).
+
+### Alterado
+
+- Idioma padrão do aplicativo alterado de **Português** para **Inglês**.
+- Strings de sugestões de teclas, rótulos de ações de sequência e opções de tipo analógico agora são instanciadas dinamicamente por diálogo (em vez de constantes de módulo), garantindo atualização correta ao trocar idioma.
+
+---
+
 ## [v2.0.0] — 2026-02-28
 
 Primeiro lançamento estável — versão oficial não pré-release.

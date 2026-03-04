@@ -2,55 +2,55 @@
 
 # JoyBind
 
-**Mapeie qualquer controle (joystick/gamepad) para teclado e mouse no Windows — sem instalar drivers**
+**Map any controller (joystick/gamepad) to keyboard and mouse on Windows — no drivers required**
 
-[![Download Latest Release](https://img.shields.io/badge/⬇%20Download-Última%20Versão-0078D6?style=for-the-badge&logo=github)](https://github.com/MateusRestier/joybind/releases)
+[![Download Latest Release](https://img.shields.io/badge/⬇%20Download-Latest%20Release-0078D6?style=for-the-badge&logo=github)](https://github.com/MateusRestier/joybind/releases)
 
 </div>
 
 ---
 
 <div align="center">
-<img src="img/painel.png" alt="Interface do JoyBind" width="820">
+<img src="img/painel.png" alt="JoyBind Interface" width="820">
 </div>
 
 ---
 
-## O que é o JoyBind?
+## What is JoyBind?
 
-O JoyBind transforma qualquer controle USB ou Bluetooth em teclado e mouse completo no Windows. Conecte o controle, configure os botões pela interface visual e clique em **Iniciar Escuta** — pronto.
+JoyBind turns any USB or Bluetooth controller into a full keyboard and mouse on Windows. Plug in your controller, configure the buttons through the visual interface and click **Start Listening** — that's it.
 
-Nenhum driver especial. Funciona com qualquer jogo ou programa que aceite teclado e mouse.
+No special drivers needed. Works with any game or application that accepts keyboard and mouse input.
 
 ---
 
-## Casos de uso
+## Use Cases
 
-| Cenário | Exemplo de configuração |
+| Scenario | Example configuration |
 |---|---|
-| **Minecraft** | Analógico esquerdo → mouse, botões → hotbar (`1`–`9`), pulo (`space`), inventário (`e`); scroll do inventário com `scroll_up` / `scroll_down` |
-| **Emuladores (PCSX2, RPCS3, Dolphin...)** | Jogue títulos sem suporte nativo a controle, mapeando cliques e movimentos de mouse a botões físicos |
-| **GOW2 / cliques rápidos** | *Modo Macro*: segure um botão e ele dispara cliques automaticamente no intervalo que você definir (ex: 60 ms) |
-| **Botões laterais do mouse** | Mapeie `mouse4` e `mouse5` (botões laterais do mouse) a botões do controle |
-| **Navegação no PC** | Use o controle como mouse completo para streaming, YouTube e navegação geral sem sair do sofá |
+| **Minecraft** | Left stick → mouse, buttons → hotbar (`1`–`9`), jump (`space`), inventory (`e`); inventory scroll with `scroll_up` / `scroll_down` |
+| **Emulators (PCSX2, RPCS3, Dolphin...)** | Play titles with no native controller support by mapping mouse clicks and movements to physical buttons |
+| **GOW2 / rapid clicking** | *Macro Mode*: hold a button and it fires clicks automatically at the interval you define (e.g. 60 ms) |
+| **Side mouse buttons** | Map `mouse4` and `mouse5` (side mouse buttons) to controller buttons |
+| **PC navigation** | Use the controller as a full mouse for streaming, YouTube and general navigation without leaving the couch |
 
 ---
 
-## Download e Instalação
+## Download and Installation
 
-### Executável pronto para uso *(recomendado)*
+### Ready-to-use executable *(recommended)*
 
-Baixe o `.exe` na página de releases — não requer Python instalado:
+Download the `.exe` from the releases page — Python not required:
 
 <div align="center">
 
-[![Download Latest Release](https://img.shields.io/badge/⬇%20Download-Última%20Versão-0078D6?style=for-the-badge&logo=github)](https://github.com/MateusRestier/joybind/releases)
+[![Download Latest Release](https://img.shields.io/badge/⬇%20Download-Latest%20Release-0078D6?style=for-the-badge&logo=github)](https://github.com/MateusRestier/joybind/releases)
 
 </div>
 
-### Via código-fonte
+### From source code
 
-Requer Python 3.11+ e Windows 10/11:
+Requires Python 3.11+ and Windows 10/11:
 
 ```bash
 git clone https://github.com/MateusRestier/joybind.git
@@ -59,177 +59,178 @@ pip install -r requirements.txt
 python main.py
 ```
 
-#### Dependências
+#### Dependencies
 
-| Pacote | Versão mínima | Uso |
+| Package | Minimum version | Purpose |
 |---|---|---|
-| `customtkinter` | 5.2.0 | Interface gráfica moderna |
-| `pygame` | 2.5.0 | Leitura de joystick/gamepad |
-| `pyautogui` | 0.9.54 | Simulação de teclado e mouse |
-| `pynput` | 1.7.6 | Captura de teclas no wizard de bind |
+| `customtkinter` | 5.2.0 | Modern graphical interface |
+| `pygame` | 2.5.0 | Joystick/gamepad reading |
+| `pyautogui` | 0.9.54 | Keyboard and mouse simulation |
+| `pynput` | 1.7.6 | Key capture in the bind wizard |
 
 ---
 
-## Como usar
+## How to Use
 
-1. Conecte o controle antes de abrir o programa (ou clique **↻** após conectar)
-2. Selecione o controle no dropdown **Controle**
-3. Clique em qualquer tile do layout visual para configurar o mapeamento
-4. Feche o diálogo — a configuração é salva automaticamente no preset ativo
-5. Clique em **Iniciar Escuta** e comece a usar
-
----
-
-## Funcionalidades
-
-- **Mapeamento de botões** — associa cada botão físico a:
-  - Tecla simples ou combinação (`enter`, `f5`, `ctrl+z`, ...)
-  - Botões de mouse, incluindo laterais (`mouse4`, `mouse5`) e scroll (`scroll_up`, `scroll_down`)
-  - Sequência de ações com temporização (mover cursor, clicar, pressionar tecla, aguardar)
-- **Segurar enquanto pressionado** — mantém a tecla pressionada enquanto o botão físico estiver segurado (ideal para correr em jogos)
-- **Modo Macro (auto-click)** — dispara a ação repetidamente no intervalo definido em ms enquanto o botão estiver pressionado
-- **Analógico como mouse** — o analógico esquerdo controla o cursor com sensibilidade configurável
-- **Analógico como scroll** — o analógico direito rola a página vertical e horizontalmente
-- **Modo manual de analógico** — mapeia cada direção (↑↓←→) de cada analógico a uma tecla, combo ou sequência
-- **Presets** — salva e carrega configurações nomeadas; troca sem reiniciar
-- **Layout visual de gamepad** — silhueta do controle com todos os botões clicáveis
-- **Captura automática** — detecta o botão físico ou tecla ao pressionar, sem digitar índices manualmente
+1. Connect the controller before opening the program (or click **↻** after connecting)
+2. Select the controller in the **Controller** dropdown
+3. Click any tile in the visual layout to configure the mapping
+4. Close the dialog — the configuration is saved automatically to the active preset
+5. Click **Start Listening** and start using
 
 ---
 
-## Configuração de Botões
+## Features
 
-Clique em qualquer tile do layout visual para abrir o diálogo de configuração. O tile exibe um ícone conforme o modo:
+- **Button mapping** — associate each physical button with:
+  - A single key or combination (`enter`, `f5`, `ctrl+z`, ...)
+  - Mouse buttons, including side buttons (`mouse4`, `mouse5`) and scroll (`scroll_up`, `scroll_down`)
+  - An action sequence with timing (move cursor, click, press key, wait)
+- **Hold while pressed** — keeps the key held while the physical button is held down (ideal for running in games)
+- **Macro Mode (auto-click)** — fires the action repeatedly at the defined interval (ms) while the button is held
+- **Stick as mouse** — the left stick controls the cursor with configurable sensitivity
+- **Stick as scroll** — the right stick scrolls the page vertically and horizontally
+- **Manual stick mode** — maps each direction (↑↓←→) of each stick to a key, combo or sequence
+- **Presets** — save and load named configurations; switch without restarting
+- **Visual gamepad layout** — controller silhouette with all buttons clickable
+- **Auto-capture** — detects the physical button or key when pressed, no need to type indices manually
+- **EN/PT interface** — language selector in the header; preference is saved and applied on restart
 
-| Ícone | Significado |
+---
+
+## Button Configuration
+
+Click any tile in the visual layout to open the configuration dialog. The tile shows an icon based on the mode:
+
+| Icon | Meaning |
 |---|---|
-| `⌨ tecla` | Tecla simples (press e release) |
-| `⬇ tecla` | Segurar enquanto pressionado |
-| `⟳ tecla` | Modo Macro (auto-click) |
-| `▶` | Sequência de ações |
-| `—` | Sem mapeamento |
+| `⌨ key` | Single key (press and release) |
+| `⬇ key` | Hold while pressed |
+| `⟳ key` | Macro Mode (auto-click) |
+| `▶` | Action sequence |
+| `—` | No mapping |
 
-### Tipo: Teclado
+### Type: Keyboard
 
-Pressiona e solta uma tecla, combinação ou botão de mouse.
+Presses and releases a key, combination or mouse button.
 
-| Opção | Descrição |
+| Option | Description |
 |---|---|
-| **Tecla** | Nome da tecla (ex: `enter`, `f5`, `ctrl+z`) ou botão de mouse (ver tabela abaixo) |
-| **Duração (ms)** | Tempo entre press e release (0 = instantâneo) |
-| **Segurar enquanto pressionado** | Mantém a tecla pressionada enquanto o botão do controle estiver segurado |
-| **Modo Macro** | Dispara a tecla repetidamente no intervalo definido (ms) enquanto o botão estiver pressionado |
+| **Key** | Key name (e.g. `enter`, `f5`, `ctrl+z`) or mouse button (see table below) |
+| **Duration (ms)** | Time between press and release (0 = instant) |
+| **Hold while pressed** | Keeps the key held while the controller button is held down |
+| **Macro Mode** | Fires the key repeatedly at the defined interval (ms) while the button is held |
 
-Use o botão **Capturar** para detectar a tecla ou botão de mouse automaticamente — inclusive `mouse4` e `mouse5`.
+Use the **Capture** button to detect the key or mouse button automatically — including `mouse4` and `mouse5`.
 
-**Teclas de mouse disponíveis:**
+**Available mouse keys:**
 
-| Valor | Ação |
+| Value | Action |
 |---|---|
-| `mouse_left` | Clique esquerdo |
-| `mouse_right` | Clique direito |
-| `mouse_middle` | Clique do meio |
-| `mouse4` | Botão lateral traseiro |
-| `mouse5` | Botão lateral dianteiro |
-| `scroll_up` | Rolar para cima (1 clique de roda) |
-| `scroll_down` | Rolar para baixo (1 clique de roda) |
+| `mouse_left` | Left click |
+| `mouse_right` | Right click |
+| `mouse_middle` | Middle click |
+| `mouse4` | Back side button |
+| `mouse5` | Forward side button |
+| `scroll_up` | Scroll up (1 wheel click) |
+| `scroll_down` | Scroll down (1 wheel click) |
 
-> Para scroll contínuo ao segurar um botão, use *Modo Macro* com `scroll_up` ou `scroll_down` e um intervalo curto (ex: 80 ms).
+> For continuous scroll while holding a button, use *Macro Mode* with `scroll_up` or `scroll_down` and a short interval (e.g. 80 ms).
 
-### Tipo: Sequência de Ações
+### Type: Action Sequence
 
-Executa uma lista ordenada de passos. Útil para macros complexas com múltiplos cliques, movimentos de mouse e esperas.
+Executes an ordered list of steps. Useful for complex macros with multiple clicks, mouse movements and waits.
 
-| Ação | Parâmetros | Descrição |
+| Action | Parameters | Description |
 |---|---|---|
-| `move_mouse` | X, Y, Salvar/Restaurar | Teleporta o cursor para a posição |
-| `click_left` | — | Clique esquerdo na posição atual |
-| `click_right` | — | Clique direito na posição atual |
-| `click_middle` | — | Clique do meio na posição atual |
-| `double_click` | — | Clique duplo na posição atual |
-| `scroll_up` | Cliques (padrão 3) | Rola para cima |
-| `scroll_down` | Cliques (padrão 3) | Rola para baixo |
-| `key` | Nome da tecla | Pressiona e solta uma tecla |
-| `delay` | Milissegundos (padrão 100) | Pausa entre passos |
+| `move_mouse` | X, Y, Save/Restore | Teleports the cursor to the position |
+| `click_left` | — | Left click at current position |
+| `click_right` | — | Right click at current position |
+| `click_middle` | — | Middle click at current position |
+| `double_click` | — | Double click at current position |
+| `scroll_up` | Clicks (default 3) | Scroll up |
+| `scroll_down` | Clicks (default 3) | Scroll down |
+| `key` | Key name | Press and release a key |
+| `delay` | Milliseconds (default 100) | Pause between steps |
 
-> **Salvar/Restaurar posição:** quando ativado em um passo `move_mouse`, o cursor retorna ao ponto de origem ao final da sequência — ideal para clicar em elementos fixos da tela sem perder a posição de trabalho.
+> **Save/Restore position:** when enabled on a `move_mouse` step, the cursor returns to its original position at the end of the sequence — ideal for clicking fixed screen elements without losing the working position.
 
 ---
 
-## Configuração Analógica
+## Analog Configuration
 
-Ative com o toggle **Mouse Mode** na seção central do layout.
+Enable with the **Mouse Mode** toggle in the central section of the layout.
 
-### Modo Mouse (ativado)
+### Mouse Mode (enabled)
 
-| Analógico | Comportamento |
+| Stick | Behavior |
 |---|---|
-| Esquerdo (eixos 0/1) | Move o cursor — sensibilidade em px/s |
-| Direito (eixos 2/3) | Rola a página — sensibilidade em cl/s |
+| Left (axes 0/1) | Moves the cursor — sensitivity in px/s |
+| Right (axes 2/3) | Scrolls the page — sensitivity in cl/s |
 
-### Modo Manual (desativado)
+### Manual Mode (disabled)
 
-Cada direção de cada analógico pode ser mapeada independentemente para:
+Each direction of each stick can be mapped independently to:
 
-| Tipo | Parâmetros extras | Descrição |
+| Type | Extra parameters | Description |
 |---|---|---|
-| `none` | — | Sem ação |
-| `mouse_x` | `sensitivity` (px/s) | Move o cursor horizontalmente |
-| `mouse_y` | `sensitivity` (px/s) | Move o cursor verticalmente |
-| `scroll_v` | `sensitivity` (cl/s) | Rola vertical |
-| `scroll_h` | `sensitivity` (cl/s) | Rola horizontal |
-| `key` | `key` (nome da tecla ou combo `ctrl+c`) | Repete a tecla/combo enquanto o analógico está ativo (~15×/s) |
-| `sequence` | `steps` (lista de passos) | Dispara a sequência uma vez ao cruzar o limite de deflexão |
+| `none` | — | No action |
+| `mouse_x` | `sensitivity` (px/s) | Move cursor horizontally |
+| `mouse_y` | `sensitivity` (px/s) | Move cursor vertically |
+| `scroll_v` | `sensitivity` (cl/s) | Vertical scroll |
+| `scroll_h` | `sensitivity` (cl/s) | Horizontal scroll |
+| `key` | `key` (key name or combo `ctrl+c`) | Repeats the key/combo while the stick is active (~15×/s) |
+| `sequence` | `steps` (list of steps) | Fires the sequence once when crossing the deflection threshold |
 
-### Parâmetros por analógico
+### Parameters per stick
 
-| Campo | Descrição |
+| Field | Description |
 |---|---|
-| **Eixo X** | Índice pygame do eixo horizontal |
-| **Eixo Y** | Índice pygame do eixo vertical |
-| **DZ** | Deadzone — fração da deflexão máxima ignorada (0.0–0.99) |
-| **Sens.** | Sensibilidade em px/s (mouse) ou cl/s (scroll) |
+| **Axis X** | pygame index of the horizontal axis |
+| **Axis Y** | pygame index of the vertical axis |
+| **DZ** | Deadzone — fraction of maximum deflection ignored (0.0–0.99) |
+| **Sens.** | Sensitivity in px/s (mouse) or cl/s (scroll) |
 
-> **Encontrando os eixos:** ative o listener, mova o analógico e observe os prints no console — os eixos com maior variação são os corretos.
+> **Finding the axes:** enable the listener, move the stick and watch the console output — the axes with the greatest variation are the correct ones.
 
 ---
 
-## Sistema de Presets
+## Preset System
 
-Cada preset é um arquivo `.json` independente. A pasta de presets pode ser alterada pelo botão **Pasta...**.
+Each preset is an independent `.json` file. The preset folder can be changed with the **Folder...** button.
 
-| Operação | Como fazer |
+| Operation | How to do it |
 |---|---|
-| Criar novo preset | Botão **Novo** → insira o nome |
-| Trocar de preset | Dropdown **Preset** |
-| Salvar alteração | Automático ao fechar diálogos de configuração |
-| Mudar pasta | **Pasta...** → escolha o diretório |
+| Create new preset | **New** button → enter the name |
+| Switch preset | **Preset** dropdown |
+| Save changes | Automatic when closing configuration dialogs |
+| Change folder | **Folder...** → choose the directory |
 
-O último preset aberto é lembrado entre sessões.
+The last opened preset is remembered between sessions.
 
 ---
 
-## Formato dos Presets (JSON)
+## Preset Format (JSON)
 
 ```jsonc
 {
   "binds": {
-    // Tecla simples: botão 0 → Enter
+    // Single key: button 0 → Enter
     "0": { "type": "keyboard", "key": "enter" },
 
-    // Segurar enquanto pressionado: botão 1 → Shift segurado
+    // Hold while pressed: button 1 → Shift held down
     "1": { "type": "keyboard", "key": "shift", "hold_while_pressed": true },
 
-    // Modo Macro: botão 2 → clique esquerdo a cada 60 ms enquanto pressionado
+    // Macro Mode: button 2 → left click every 60 ms while held
     "2": { "type": "keyboard", "key": "mouse_left", "macro_interval_ms": 60 },
 
-    // Scroll para cima via botão do controle
+    // Scroll up via controller button
     "4": { "type": "keyboard", "key": "scroll_up" },
 
-    // Botão lateral do mouse (mouse4)
+    // Side mouse button (mouse4)
     "5": { "type": "keyboard", "key": "mouse4" },
 
-    // Sequência: botão 3 → move mouse, clica e pressiona F5
+    // Sequence: button 3 → move mouse, click and press F5
     "3": {
       "type": "sequence",
       "steps": [
@@ -242,12 +243,12 @@ O último preset aberto é lembrado entre sessões.
   },
 
   "analog": {
-    // true = modo mouse (esq→cursor, dir→scroll); false = modo manual por direção
+    // true = mouse mode (left→cursor, right→scroll); false = manual direction mode
     "enabled": true,
 
     "sticks": [
       {
-        "label": "Esquerdo", "axis_x": 0, "axis_y": 1,
+        "label": "Left", "axis_x": 0, "axis_y": 1,
         "deadzone": 0.15, "sensitivity": 600.0,
         "up":    { "type": "mouse_y", "sensitivity": 600 },
         "down":  { "type": "mouse_y", "sensitivity": 600 },
@@ -255,7 +256,7 @@ O último preset aberto é lembrado entre sessões.
         "right": { "type": "mouse_x", "sensitivity": 600 }
       },
       {
-        "label": "Direito", "axis_x": 2, "axis_y": 3,
+        "label": "Right", "axis_x": 2, "axis_y": 3,
         "deadzone": 0.15, "sensitivity": 10000.0,
         "up":    { "type": "key",      "key": "w" },
         "down":  { "type": "key",      "key": "ctrl+z" },
@@ -269,91 +270,91 @@ O último preset aberto é lembrado entre sessões.
 
 ---
 
-## Observações
+## Notes
 
-- **FailSafe:** mova o mouse para o canto superior esquerdo da tela para abortar qualquer sequência em execução (comportamento padrão do pyautogui).
-- **Scroll horizontal:** implementado via `Shift + scroll` para máxima compatibilidade com aplicativos Windows (Chrome, VS Code, Office, etc.).
-- **Raw Input / jogos:** botões de mouse e scroll usam `SendInput` do Windows, garantindo compatibilidade com jogos que leem input por Raw Input.
-- **Eixos com valores "diagonais":** alguns controles mapeiam eixos em 45°. Se o analógico responder de forma incorreta, troque os valores de Eixo X e Eixo Y ou use sensibilidade negativa para inverter o sinal.
-
----
-
-## Solução de Problemas
-
-### Controle não aparece no dropdown
-
-1. Conecte o controle **antes** de abrir o programa, ou clique **↻** após conectar.
-2. Verifique se o controle é reconhecido pelo Windows (Painel de Controle → Dispositivos de Jogo).
-3. Alguns controles Bluetooth requerem alguns segundos após o pareamento.
-4. Se o controle aparece com nome genérico ("Controle #0"), ainda funcionará normalmente para leitura de botões e eixos.
-
-### Botão não responde ao pressionar
-
-- Confirme que **Iniciar Escuta** está ativo (indicador verde).
-- O índice configurado pode não corresponder ao botão físico — use **Capturar** no diálogo para detectar o índice correto.
-- Pressione o botão por pelo menos 50 ms (o polling roda a 60 Hz ≈ 16 ms por frame).
-
-### Ações de teclado não funcionam no jogo/aplicativo
-
-- Execute o JoyBind como **Administrador**.
-- Para jogos com anti-cheat, o mapeamento via software pode ser bloqueado por design.
-
-### Analógico move o mouse de forma errática ou invertida
-
-- Verifique os índices **Eixo X** e **Eixo Y** — troque-os se os eixos estiverem invertidos.
-- Aumente o valor de **DZ** (deadzone) se o cursor se mover com o analógico solto.
-- Sensibilidade negativa inverte a direção do eixo.
-- Ative o listener e mova o analógico — o console exibe os valores brutos para diagnóstico.
-
-### Sequência interrompida no meio
-
-- O mouse pode ter atingido o canto superior esquerdo da tela (FailSafe do pyautogui). Desative com `pyautogui.FAILSAFE = False` em `actions.py` se necessário.
-- Verifique se algum passo tem `delay` muito longo.
-
-### Preset não salva / arquivo corrompido
-
-- O programa salva com escrita atômica (`.tmp` → `rename`). Verifique se a pasta tem permissão de escrita.
-- Se `settings.json` sumir, o programa recria com os padrões ao abrir.
+- **FailSafe:** move the mouse to the top-left corner of the screen to abort any running sequence (default pyautogui behavior).
+- **Horizontal scroll:** implemented via `Shift + scroll` for maximum compatibility with Windows applications (Chrome, VS Code, Office, etc.).
+- **Raw Input / games:** mouse buttons and scroll use Windows `SendInput`, ensuring compatibility with games that read input via Raw Input.
+- **Axes with "diagonal" values:** some controllers map axes at 45°. If the stick responds incorrectly, swap the Axis X and Axis Y values or use negative sensitivity to invert the signal.
 
 ---
 
-## Referência de Nomes de Teclas
+## Troubleshooting
 
-Utilize os nomes abaixo nos campos de tecla. Compatíveis com o pyautogui.
+### Controller doesn't appear in the dropdown
 
-### Teclas especiais
+1. Connect the controller **before** opening the program, or click **↻** after connecting.
+2. Check that the controller is recognized by Windows (Control Panel → Game Controllers).
+3. Some Bluetooth controllers require a few seconds after pairing.
+4. If the controller appears with a generic name ("Controller #0"), it will still work normally for reading buttons and axes.
 
-| Nome | Tecla |
+### Button doesn't respond when pressed
+
+- Confirm that **Start Listening** is active (green indicator).
+- The configured index may not match the physical button — use **Capture** in the dialog to detect the correct index.
+- Press the button for at least 50 ms (polling runs at 60 Hz ≈ 16 ms per frame).
+
+### Keyboard actions don't work in the game/application
+
+- Run JoyBind as **Administrator**.
+- For games with anti-cheat, software-based mapping may be blocked by design.
+
+### Stick moves the mouse erratically or in the wrong direction
+
+- Check the **Axis X** and **Axis Y** indices — swap them if the axes are reversed.
+- Increase the **DZ** (deadzone) value if the cursor moves with the stick released.
+- Negative sensitivity inverts the axis direction.
+- Enable the listener and move the stick — the console displays raw values for diagnosis.
+
+### Sequence interrupted in the middle
+
+- The mouse may have reached the top-left corner of the screen (pyautogui FailSafe). Disable with `pyautogui.FAILSAFE = False` in `actions.py` if needed.
+- Check if any step has a very long `delay`.
+
+### Preset not saving / corrupted file
+
+- The program saves with atomic writes (`.tmp` → `rename`). Check that the folder has write permission.
+- If `settings.json` disappears, the program recreates it with defaults on next launch.
+
+---
+
+## Key Name Reference
+
+Use the names below in key fields. Compatible with pyautogui.
+
+### Special keys
+
+| Name | Key |
 |---|---|
 | `enter` | Enter / Return |
-| `space` | Barra de espaço |
+| `space` | Space bar |
 | `tab` | Tab |
 | `backspace` | Backspace |
 | `delete` | Delete |
 | `escape` | Escape |
-| `up` / `down` / `left` / `right` | Setas direcionais |
+| `up` / `down` / `left` / `right` | Arrow keys |
 | `home` / `end` | Home / End |
 | `pageup` / `pagedown` | Page Up / Page Down |
 | `insert` | Insert |
-| `f1` … `f12` | Teclas de função |
+| `f1` … `f12` | Function keys |
 | `printscreen` | Print Screen |
 | `scrolllock` | Scroll Lock |
 | `pause` | Pause/Break |
 | `capslock` | Caps Lock |
 | `numlock` | Num Lock |
 
-### Modificadores
+### Modifiers
 
-| Nome | Tecla |
+| Name | Key |
 |---|---|
 | `ctrl` / `ctrlleft` / `ctrlright` | Control |
 | `shift` / `shiftleft` / `shiftright` | Shift |
 | `alt` / `altleft` / `altright` | Alt |
 | `win` | Windows / Super |
 
-### Teclado numérico
+### Numpad
 
-| Nome | Tecla |
+| Name | Key |
 |---|---|
 | `num0` … `num9` | Numpad 0–9 |
 | `add` | Numpad + |
@@ -365,22 +366,22 @@ Utilize os nomes abaixo nos campos de tecla. Compatíveis com o pyautogui.
 
 ### Combos
 
-Combine modificadores com `+`:
+Combine modifiers with `+`:
 
 ```
-ctrl+c          → Copiar
-ctrl+shift+esc  → Gerenciador de tarefas
-alt+f4          → Fechar janela
-win+d           → Mostrar área de trabalho
-ctrl+alt+delete → (funciona apenas parcialmente via software)
+ctrl+c          → Copy
+ctrl+shift+esc  → Task Manager
+alt+f4          → Close window
+win+d           → Show desktop
+ctrl+alt+delete → (works only partially via software)
 ```
 
-> **Dica:** use o botão **Capturar** no diálogo de bind para detectar o nome correto automaticamente ao pressionar a tecla desejada.
+> **Tip:** use the **Capture** button in the bind dialog to automatically detect the correct name when you press the desired key.
 
 ---
 
-## Para Desenvolvedores
+## For Developers
 
-- [CHANGELOG.md](CHANGELOG.md) — histórico de versões e mudanças
-- [CONTRIBUTING.md](docs/CONTRIBUTING.md) — convenções de código, formato de preset, guias de extensão
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — como cada arquivo funciona, por que as decisões foram tomadas, fluxo completo de uma ação do botão ao OS
+- [CHANGELOG.md](CHANGELOG.md) — version history and changes
+- [CONTRIBUTING.md](docs/CONTRIBUTING.md) — code conventions, preset format, extension guides
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — how each file works, why decisions were made, full flow of an action from button to OS

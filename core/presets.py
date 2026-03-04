@@ -41,6 +41,7 @@ def load_settings() -> dict:
     defaults: dict = {
         "presets_dir": str(DEFAULT_PRESETS_DIR),
         "last_preset": None,
+        "language":    "en",
     }
     if SETTINGS_FILE.exists():
         try:
