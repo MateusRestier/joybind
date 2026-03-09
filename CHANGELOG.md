@@ -18,6 +18,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 - Idioma padrão do aplicativo alterado de **Português** para **Inglês**.
 - Strings de sugestões de teclas, rótulos de ações de sequência e opções de tipo analógico agora são instanciadas dinamicamente por diálogo (em vez de constantes de módulo), garantindo atualização correta ao trocar idioma.
+- README.md traduzido para inglês.
+- Screenshot `painel.png` atualizado para refletir a interface em inglês.
+
+### Commits
+
+- `d467419` feat: EN/PT internationalization with language selector in header
 
 ---
 
@@ -72,17 +78,28 @@ Esta versão marca a maturidade do JoyBind: a interface ganhou novos controles d
 ## [v1.1.1] — 2026-02-23
 
 ### Adicionado
+
 - **Botão Apagar preset** na barra de presets — remove o arquivo `.json` com confirmação.
 
 ### Corrigido
+
 - Ícone da janela gerado com LANCZOS e `append_images` — elimina desfoque no tamanho 16×16.
 - Build do `.exe`: logo.ico embutido no executável e processo de build auto-elevado via UAC para bypass do Defender.
+
+### Commits
+
+- `c66ba44` build: embute logo.ico no .exe e auto-eleva build via UAC para bypass do Defender
+- `b20d3a4` fix: gera ICO da janela com LANCZOS e append_images (melhor qualidade 16x16)
+- `a8806d3` feat: botão Apagar preset na barra de presets
+- `d507f4f` fix: ícone na barra de tarefas via AppUserModelID + WM_SETICON
+- `bcf482f` feat: usa logo.png como ícone da janela e imagem no header
 
 ---
 
 ## [v1.1.0] — 2026-02-23
 
 ### Adicionado
+
 - **Modo por stick independente** — cada analógico tem seu modo configurável separadamente: esquerdo (mouse / game / manual), direito (scroll / game / manual).
 - **Modo Game** — analógico esquerdo em modo game aciona WASD com edge-detection; analógico direito em modo game move o cursor (câmera).
 - **Captura de clique de mouse no BindDialog** — detecta `mouse_left`, `mouse_right`, `mouse_middle` via `pynput MouseListener`.
@@ -91,13 +108,27 @@ Esta versão marca a maturidade do JoyBind: a interface ganhou novos controles d
 - Script de build (`scripts/`) e spec do PyInstaller para gerar `.exe` standalone.
 
 ### Alterado
+
 - Labels dos botões migrados de PlayStation (○△□×, L1/L2/R1/R2) para **Xbox** (A/B/X/Y, LB/LT/RB/RT).
 - Dados do usuário (`settings.json` e pasta de presets) movidos para `%APPDATA%\JoyBind\`.
 
 ### Corrigido
+
 - **Movimento de mouse** agora usa `SendInput` com `MOUSEEVENTF_MOVE` relativo — compatível com Raw Input de jogos como Minecraft, que ignoravam `SetCursorPos`.
 - Stuttering visual ao rolar o layout eliminado com debounce nas atualizações.
 - Caminho de presets e `settings.json` corrigido no executável compilado.
+
+### Commits
+
+- `afe04c1` fix: usa SendInput para movimento de mouse compatível com Raw Input
+- `aac8e91` feat: per-stick mode UI, mouse capture e edge-triggered WASD
+- `d8a505f` refactor(ui): Xbox labels, scroll fix e scrollbar auto-hide
+- `ac7d262` fix: debounce scroll layout updates to eliminate visual stuttering
+- `a2776bb` refactor: migrate button labels from PlayStation to Xbox style
+- `17d0934` fix: move settings.json e presets/ para %APPDATA%\JoyBind\
+- `e8e2a6e` fix: corrige caminho de presets/settings no executável compilado
+- `35b5fa2` chore: adiciona script de build e spec do PyInstaller
+- `5e7322d` feat: adiciona botão de feedback no toolbar
 
 ---
 
@@ -106,6 +137,7 @@ Esta versão marca a maturidade do JoyBind: a interface ganhou novos controles d
 Primeira versão pública.
 
 ### Adicionado
+
 - **Core backend**:
   - `core/controller.py` — `ControllerListener`: polling de joystick a 60 Hz em thread daemon, detecção de borda de subida por botão, sem dependência de display pygame.
   - `core/actions.py` — `execute_keyboard` (teclas e combos `ctrl+c`), `execute_sequence` (timeline de passos).
@@ -128,3 +160,16 @@ Primeira versão pública.
 - Scrollbar horizontal na área do layout do controle.
 - Botão de feedback (abre página de issues do GitHub).
 - Documentação inicial: README e `docs/CONTRIBUTING.md`.
+
+### Commits
+
+- `47925ab` feat: implement core backend modules
+- `36c781f` feat: implement GUI with bind management and controller button capture
+- `d91b7b2` feat: add horizontal scrollbar to controller layout area
+- `64e4ce6` feat: replace single config.json with named preset file system
+- `7dd7337` feat: replace mouse_combo with flexible action sequence (timeline)
+- `d151976` feat: layout visual de gamepad substitui as abas de Botões/Analógicos
+- `d238205` feat: layout visual de botões configurável, auto-mapear e suporte a L2/R2/D-pad
+- `3851266` refactor: move core modules to core/ package; update gui/app.py imports
+- `c982fe9` feat: right stick scrolls in mouse mode; per-stick sensitivity control in UI
+- `1f66101` docs: rewrite README as user guide; add CONTRIBUTING.md developer guide
