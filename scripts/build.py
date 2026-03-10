@@ -20,9 +20,15 @@ from pathlib import Path
 
 ROOT  = Path(__file__).resolve().parent.parent
 SPEC  = ROOT / "JoyBind.spec"
+# Compila em pasta local (fora do Google Drive) para evitar travamento de arquivo
+# pelo cliente de sync durante a escrita do .exe. Depois copia para ROOT/dist.
+_LOCAL_TMP = Path(tempfile.gettempdir()) / "joybind_build"
+DIST_LOCAL = _LOCAL_TMP / "dist"
+BUILD_LOCAL = _LOCAL_TMP / "build"
 DIST  = ROOT / "dist"
 BUILD = ROOT / "build"
 EXE   = DIST / "JoyBind.exe"
+EXE_LOCAL = DIST_LOCAL / "JoyBind.exe"
 
 # Variável de ambiente que sinaliza que fomos relançados como admin
 _RELAUNCHED_AS_ADMIN = "JOYBIND_BUILD_RELAUNCHED"
@@ -92,35 +98,44 @@ def main() -> None:
     print(f"Spec            : {SPEC}")
     print()
 
-    # ── Limpa build anterior ──────────────────────────────────────────────
-    for folder in (BUILD, DIST):
+    # ── Limpa builds anteriores ───────────────────────────────────────────
+    for folder in (BUILD_LOCAL, DIST_LOCAL, BUILD, DIST):
         if folder.exists():
-            print(f"Removendo {folder.name}/...")
+            print(f"Removendo {folder}...")
             shutil.rmtree(folder)
+    DIST_LOCAL.mkdir(parents=True, exist_ok=True)
 
     # ── Exclusão temporária no Defender ───────────────────────────────────
-    DIST.mkdir(parents=True, exist_ok=True)
     print("Adicionando exclusão temporária no Windows Defender...")
-    _defender_exclusion("add", DIST)
+    _defender_exclusion("add", _LOCAL_TMP)
 
-    # ── Compilação ────────────────────────────────────────────────────────
-    print("Compilando...\n")
+    # ── Compilação em pasta local (fora do Google Drive) ──────────────────
+    print(f"Compilando em pasta local: {_LOCAL_TMP}\n")
     result = subprocess.run(
-        ["pyinstaller", str(SPEC), "--distpath", str(DIST)],
+        [
+            "pyinstaller", str(SPEC),
+            "--distpath", str(DIST_LOCAL),
+            "--workpath", str(BUILD_LOCAL),
+        ],
         cwd=ROOT,
     )
 
     # ── Remove exclusão ───────────────────────────────────────────────────
     print("\nRemovendo exclusão do Windows Defender...")
-    _defender_exclusion("remove", DIST)
+    _defender_exclusion("remove", _LOCAL_TMP)
 
     # ── Resultado ─────────────────────────────────────────────────────────
     if result.returncode != 0:
         print("\nErro na compilação.")
         sys.exit(result.returncode)
 
+    # ── Copia para ROOT/dist ──────────────────────────────────────────────
+    print(f"\nCopiando resultado para {DIST}...")
+    DIST.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(EXE_LOCAL, EXE)
+
     size_mb = EXE.stat().st_size / (1024 * 1024)
-    print(f"\nExecutável gerado: {EXE}  ({size_mb:.1f} MB)")
+    print(f"Executável gerado: {EXE}  ({size_mb:.1f} MB)")
     print("Pronto!")
 
 
