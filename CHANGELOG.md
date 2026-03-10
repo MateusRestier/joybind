@@ -6,6 +6,29 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [v2.1.1] — 2026-03-10
+
+### Corrigido
+
+- **Portabilidade entre PCs (Google Drive / pen drive)** — presets e configurações agora funcionam corretamente ao abrir o app em outro PC onde o Google Drive está montado em caminho diferente. `settings.json` e `presets/` ficam ao lado do `.exe`; caminhos são salvos como relativos ao executável, eliminando dependência de letras de drive ou estrutura de pastas do sistema.
+- **Migração automática de settings legados** — ao abrir pela primeira vez em modo portátil, settings antigos do `%APPDATA%\JoyBind\` são migrados automaticamente.
+- **Caminhos inválidos no settings.json** — se `presets_dir` ou `last_preset` não existirem no PC atual (settings de outro PC), o app volta ao padrão silenciosamente em vez de abrir sem presets.
+- **`btn_layout` salvo dentro do preset JSON** — o mapeamento visual de botões agora viaja junto com o preset, resolvendo tiles mostrando `—` ao abrir presets criados em outro PC.
+- **Troca de idioma sem restart de processo** — a troca EN/PT agora reconstrói a UI in-place em vez de reiniciar o executável, eliminando crash com PyInstaller onefile (race condition na extração da pasta temp `_MEI...`).
+- **Build com Google Drive aberto** — compilação com `python scripts/build.py` falhava intermitentemente com "Acesso negado" porque o cliente do Drive travava o `.exe` recém-criado. O build agora compila em `%TEMP%\joybind_build\` e copia o resultado para `dist/` apenas ao final.
+
+### Adicionado
+
+- **Aviso de layout não verificado** — quando um preset é aberto sem `btn_layout` confirmado, um label amarelo avisa o usuário que os tiles usam o layout padrão e sugere rodar o Auto-mapear. O aviso desaparece automaticamente ao mapear qualquer botão ou rodar o Auto-mapear.
+
+### Commits
+
+- `59e243a` fix(portability): store settings paths relative to exe
+- `a8642c2` fix(ui): save btn_layout in preset, warn if unverified, rebuild UI on lang change
+- `c826062` build: compile to local temp dir to avoid Google Drive file locking
+
+---
+
 ## [v2.1.0] — 2026-03-04
 
 ### Adicionado
