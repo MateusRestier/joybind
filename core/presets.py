@@ -115,6 +115,15 @@ def load_settings() -> dict:
     return defaults
 
 
+def _hide_file(path: Path) -> None:
+    """Marca arquivo como oculto no Windows (não aparece no Explorer)."""
+    try:
+        import ctypes
+        ctypes.windll.kernel32.SetFileAttributesW(str(path), 0x2)  # FILE_ATTRIBUTE_HIDDEN
+    except Exception:
+        pass
+
+
 def save_settings(settings: dict) -> None:
     """Salva settings.json de forma atômica.
     Em modo portátil, converte caminhos para relativos ao exe."""
@@ -129,6 +138,7 @@ def save_settings(settings: dict) -> None:
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(to_save, f, indent=2, ensure_ascii=False)
         tmp.replace(SETTINGS_FILE)
+        _hide_file(SETTINGS_FILE)
     except OSError as e:
         print(f"[Presets] Erro ao salvar settings.json: {e}")
 

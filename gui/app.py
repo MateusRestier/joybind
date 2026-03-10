@@ -1518,12 +1518,13 @@ class App:
 
     def _apply_preset(self, path: Path) -> None:
         self.cfg = self._ensure_defaults(presets.load_preset(path))
-        # Restaura btn_layout salvo no preset (portabilidade entre PCs)
+        # Restaura btn_layout: preset > settings (fallback para presets antigos) > padrão vazio
         if self.cfg.get("btn_layout"):
             self._layout = {**_DEFAULT_LAYOUT, **self.cfg["btn_layout"]}
             self._settings["btn_layout"] = dict(self._layout)
         else:
-            self._layout = dict(_DEFAULT_LAYOUT)
+            saved_layout = self._settings.get("btn_layout", {})
+            self._layout = {**_DEFAULT_LAYOUT, **saved_layout}
         self._current_preset_path = path
         self.root.title(f"JoyBind — {path.stem}")
         self._settings["last_preset"] = str(path)
