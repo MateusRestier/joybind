@@ -20,12 +20,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ### Adicionado
 
 - **Aviso de layout não verificado** — quando um preset é aberto sem `btn_layout` confirmado, um label amarelo avisa o usuário que os tiles usam o layout padrão e sugere rodar o Auto-mapear. O aviso desaparece automaticamente ao mapear qualquer botão ou rodar o Auto-mapear.
+- **`settings.json` oculto** — arquivo de configuração marcado como oculto no Windows após cada gravação; não aparece na pasta do app no Explorer, mas continua funcionando normalmente.
 
 ### Commits
 
 - `59e243a` fix(portability): store settings paths relative to exe
 - `a8642c2` fix(ui): save btn_layout in preset, warn if unverified, rebuild UI on lang change
 - `c826062` build: compile to local temp dir to avoid Google Drive file locking
+- `ecb5bff` docs(changelog): v2.1.1 — portabilidade, aviso de layout e fix de build
+- `94e7b41` fix: hide settings.json and restore layout fallback for old presets
 
 ---
 
