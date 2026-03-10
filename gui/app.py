@@ -113,8 +113,6 @@ def _sanitize_filename(name: str) -> str:
 # Sensibilidade de scroll (cliques/s) usada pelo analógico direito no modo mouse
 _SCROLL_SENS_MOUSE_MODE: float = 8.0
 
-# Intervalo de frames entre pressões repetidas de tecla no modo analógico
-# Layout padrão: vazio — o usuário configura manualmente ou via Auto-mapear.
 _DEFAULT_LAYOUT: dict[str, str] = {}
 
 # Ordem em que o wizard de Auto-mapear percorre os tiles
@@ -554,9 +552,10 @@ class App:
         self.root.title(title)
 
         # ── Layout de botões (visual_id → btn_key) ───────────────────
-        # Carregado das configurações globais; _DEFAULT_LAYOUT é usado como fallback.
-        saved_layout = self._settings.get("btn_layout", {})
-        self._layout: dict[str, str] = {**_DEFAULT_LAYOUT, **saved_layout}
+        # Prioridade: btn_layout do preset > settings > _DEFAULT_LAYOUT (Xbox padrão).
+        saved_layout  = self._settings.get("btn_layout", {})
+        preset_layout = self.cfg.get("btn_layout", {})
+        self._layout: dict[str, str] = {**_DEFAULT_LAYOUT, **saved_layout, **preset_layout}
 
         # ── Estado geral ──────────────────────────────────────────────
         self._is_listening = False
@@ -581,6 +580,7 @@ class App:
         self._left_stick_frame:  ctk.CTkFrame | None = None
         self._right_stick_frame: ctk.CTkFrame | None = None
         self._stick_panels:      list[dict | None]   = [None, None]
+        self._layout_warning_label: ctk.CTkLabel | None = None
 
         self.listener = ControllerListener(
             on_button_press=self._on_button_press,
@@ -811,6 +811,14 @@ class App:
             ),
         ).pack(side="right")
 
+        self._layout_warning_label = ctk.CTkLabel(
+            scroll,
+            text=t("warn_layout_unverified"),
+            font=ctk.CTkFont(size=11),
+            text_color=("#b8860b", "#e6b800"),
+        )
+        self._update_layout_warning()
+
         # 1. Gatilhos / ombros (topo)
         self._build_trigger_row(scroll)
 
@@ -972,6 +980,7 @@ class App:
             if vid in self._layout:
                 del self._layout[vid]
             self._settings["btn_layout"] = dict(self._layout)
+            self.cfg["btn_layout"] = dict(self._layout)
             presets.save_settings(self._settings)
             self._update_btn_tiles()
             self._save_current_preset()
@@ -982,9 +991,20 @@ class App:
             self.cfg["binds"][new_key] = dlg.result["bind"]
             self._layout[vid] = new_key
             self._settings["btn_layout"] = dict(self._layout)
+            self.cfg["btn_layout"] = dict(self._layout)
             presets.save_settings(self._settings)
+            self._update_layout_warning()
             self._update_btn_tiles()
             self._save_current_preset()
+
+    def _update_layout_warning(self) -> None:
+        """Mostra aviso se o btn_layout não foi confirmado via Auto-mapear."""
+        if self._layout_warning_label is None:
+            return
+        if self.cfg.get("btn_layout"):
+            self._layout_warning_label.pack_forget()
+        else:
+            self._layout_warning_label.pack(fill="x", padx=8, pady=(2, 0))
 
     def _update_btn_tiles(self) -> None:
         """Atualiza o texto de todos os tiles com as bindings atuais do cfg."""
@@ -1004,6 +1024,7 @@ class App:
             self.cfg["binds"] = {}
             self._layout = dict(_DEFAULT_LAYOUT)
             self._settings["btn_layout"] = dict(_DEFAULT_LAYOUT)
+            self.cfg["btn_layout"] = dict(_DEFAULT_LAYOUT)
             presets.save_settings(self._settings)
             self._update_btn_tiles()
             self._save_current_preset()
@@ -1025,7 +1046,9 @@ class App:
             self.cfg["binds"].update(old_binds)
             self._layout = new_layout
             self._settings["btn_layout"] = new_layout
+            self.cfg["btn_layout"] = dict(new_layout)
             presets.save_settings(self._settings)
+            self._update_layout_warning()
             self._update_btn_tiles()
             self._save_current_preset()
 
@@ -1495,10 +1518,17 @@ class App:
 
     def _apply_preset(self, path: Path) -> None:
         self.cfg = self._ensure_defaults(presets.load_preset(path))
+        # Restaura btn_layout salvo no preset (portabilidade entre PCs)
+        if self.cfg.get("btn_layout"):
+            self._layout = {**_DEFAULT_LAYOUT, **self.cfg["btn_layout"]}
+            self._settings["btn_layout"] = dict(self._layout)
+        else:
+            self._layout = dict(_DEFAULT_LAYOUT)
         self._current_preset_path = path
         self.root.title(f"JoyBind — {path.stem}")
         self._settings["last_preset"] = str(path)
         presets.save_settings(self._settings)
+        self._update_layout_warning()
         self._update_btn_tiles()
         self._render_analog_config()
 
@@ -1733,20 +1763,36 @@ class App:
     # ──────────────────────────────────────────────────────────────
 
     def _on_lang_change(self, lang: str) -> None:
-        """Saves language preference and restarts the application."""
+        """Saves language preference and rebuilds the UI in-place."""
         if i18n._lang == lang:
             return  # Already active
-        import subprocess
-        import sys as _sys2
         s = presets.load_settings()
         s["language"] = lang
         presets.save_settings(s)
-        if getattr(_sys2, "frozen", False):
-            subprocess.Popen([_sys2.executable])
-        else:
-            subprocess.Popen([_sys2.executable] + _sys2.argv)
-        self.shutdown()
-        self.root.destroy()
+        i18n.set_lang(lang)
+
+        # Destrói todos os widgets filhos sem fechar a janela.
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # Reseta variáveis de UI que serão recriadas pelo _build_ui.
+        self._btn_tiles = {}
+        self._layout_warning_label = None
+        self._left_stick_frame = None
+        self._right_stick_frame = None
+        self._stick_panels = [None, None]
+
+        # Reconstrói a interface completa com o novo idioma.
+        title = (
+            f"JoyBind — {self._current_preset_path.stem}"
+            if self._current_preset_path else "JoyBind"
+        )
+        self.root.title(title)
+        self._build_ui()
+        self._refresh_joystick_dropdown()
+        self._refresh_preset_dropdown()
+        self._update_btn_tiles()
+        self._render_analog_config()
 
     def shutdown(self) -> None:
         try:

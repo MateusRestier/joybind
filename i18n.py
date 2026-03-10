@@ -230,6 +230,11 @@ _PT: dict[str, str] = {
     # ── Icon errors (main.py) ─────────────────────────────────────────────────
     "err_icon_taskbar": "[Icon] Erro ao definir ícone na taskbar: {e}",
     "err_icon":         "[Icon] Erro ao definir ícone: {e}",
+
+    # ── Layout warning ────────────────────────────────────────────────────────
+    "warn_layout_unverified":
+        "⚠ Mapeamento de botões não verificado — os tiles usam o layout Xbox padrão."
+        " Use Auto-mapear para confirmar os botões do seu controle.",
 }
 
 _EN: dict[str, str] = {
@@ -405,6 +410,11 @@ _EN: dict[str, str] = {
     # ── Icon errors (main.py) ─────────────────────────────────────────────────
     "err_icon_taskbar": "[Icon] Error setting taskbar icon: {e}",
     "err_icon":         "[Icon] Error setting icon: {e}",
+
+    # ── Layout warning ────────────────────────────────────────────────────────
+    "warn_layout_unverified":
+        "⚠ Button mapping not verified — tiles use the default Xbox layout."
+        " Run Auto-map to confirm your controller's buttons.",
 }
 
 
