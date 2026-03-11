@@ -445,6 +445,8 @@ _SUGG_PT: list[tuple[str, str]] = [
     ("🖱 Mouse 5 (lateral front.)", "mouse5"),
     ("🖱 Scroll para Cima",        "scroll_up"),
     ("🖱 Scroll para Baixo",       "scroll_down"),
+    ("🖱 Scroll para Direita",     "scroll_right"),
+    ("🖱 Scroll para Esquerda",    "scroll_left"),
     ("↵ Enter",                    "enter"),
     ("␣ Espaço",                   "space"),
     ("⎋ Escape",                   "escape"),
@@ -484,6 +486,8 @@ _SUGG_EN: list[tuple[str, str]] = [
     ("🖱 Mouse 5 (front side)",   "mouse5"),
     ("🖱 Scroll Up",              "scroll_up"),
     ("🖱 Scroll Down",            "scroll_down"),
+    ("🖱 Scroll Right",           "scroll_right"),
+    ("🖱 Scroll Left",            "scroll_left"),
     ("↵ Enter",                   "enter"),
     ("␣ Space",                   "space"),
     ("⎋ Escape",                  "escape"),
@@ -527,6 +531,8 @@ _SAL_PT: dict[str, str] = {
     "delay":        "Intervalo (ms)",
     "scroll_up":    "Rolar para cima",
     "scroll_down":  "Rolar para baixo",
+    "scroll_right": "Rolar para direita",
+    "scroll_left":  "Rolar para esquerda",
 }
 
 _SAL_EN: dict[str, str] = {
@@ -539,6 +545,8 @@ _SAL_EN: dict[str, str] = {
     "delay":        "Delay (ms)",
     "scroll_up":    "Scroll up",
     "scroll_down":  "Scroll down",
+    "scroll_right": "Scroll right",
+    "scroll_left":  "Scroll left",
 }
 
 

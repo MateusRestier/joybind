@@ -1441,7 +1441,27 @@ class App:
                 self._release_stick_keys(i, stick)
 
             else:
-                # Modo manual: key bindings e sequências por direção
+                # Modo manual: key bindings e sequências por direção.
+                # Tipos contínuos (mouse_x/y, scroll) acumulam pelo valor bruto do eixo
+                # para evitar dupla contagem (up+down apontam para o mesmo eixo).
+                _cont = {"mouse_x", "mouse_y", "scroll_v", "scroll_h"}
+                _seen: set[str] = set()
+                for d in ("up", "down", "left", "right"):
+                    b = stick.get(d, {"type": "none"})
+                    btype = b.get("type", "none")
+                    if btype in _cont and btype not in _seen:
+                        _seen.add(btype)
+                        sens_d = float(b.get("sensitivity", sens))
+                        if btype == "mouse_x":
+                            dx += sx * sens_d / 60.0
+                        elif btype == "mouse_y":
+                            dy += sy * sens_d / 60.0
+                        elif btype == "scroll_v":
+                            sv -= sy * sens_d / 60.0
+                        elif btype == "scroll_h":
+                            sh += sx * sens_d / 60.0
+
+                # Tipos discretos (key, sequence) usam edge-trigger por direção
                 for direction, axis_val in [
                     ("up",    -sy),
                     ("down",   sy),
@@ -1458,10 +1478,10 @@ class App:
                     if btype == "key" and b.get("key"):
                         combo = b["key"]
                         if is_active and not was_active:
-                            actions.key_combo_down(combo)
+                            actions.hold_down(combo)
                             self._held_keys.add(combo)
                         elif not is_active and was_active:
-                            actions.key_combo_up(combo)
+                            actions.hold_up(combo)
                             self._held_keys.discard(combo)
 
                     if btype == "sequence" and is_active and not was_active:
@@ -1494,14 +1514,14 @@ class App:
             if self._prev_dir_active.get(k, False):
                 b = stick.get(direction, {"type": "none"})
                 if b.get("type") == "key" and b.get("key"):
-                    actions.key_combo_up(b["key"])
+                    actions.hold_up(b["key"])
                     self._held_keys.discard(b["key"])
                 self._prev_dir_active[k] = False
 
     def _release_all_held_keys(self) -> None:
         for key in list(self._held_keys):
             try:
-                actions.key_combo_up(key)
+                actions.hold_up(key)
             except Exception:
                 pass
         self._held_keys.clear()

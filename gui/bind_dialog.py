@@ -27,7 +27,7 @@ from i18n import t, kb_suggestions, step_action_labels
 _MOUSE_KEYS: frozenset[str] = frozenset({
     "mouse_left", "mouse_right", "mouse_middle",
     "mouse4", "mouse5",
-    "scroll_up", "scroll_down",
+    "scroll_up", "scroll_down", "scroll_right", "scroll_left",
 })
 
 _MOUSE_BTN_NAMES: dict = {}  # preenchido após import pynput (lazy)

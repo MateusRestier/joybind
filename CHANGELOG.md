@@ -6,6 +6,24 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [v2.1.2] — 2026-03-11
+
+### Adicionado
+
+- **Scroll horizontal como bind** — `scroll_right` e `scroll_left` agora são mapeáveis a botões do controle via `SendInput MOUSEEVENTF_HWHEEL`. Aparecem nas sugestões do BindDialog e são compatíveis com modo macro para scroll contínuo.
+
+### Corrigido
+
+- **Binds manuais por direção no analógico direito (e em qualquer stick em modo `none`)** — ações como `mouse_left`, `scroll_up`, `mouse4`, etc. vinculadas a direções não eram executadas. Causa: `key_combo_down/up` (usado internamente) não roteava nomes de teclas de mouse pelo SendInput. Substituído por `hold_down/hold_up` que já contém esse tratamento.
+- **`mouse_x`/`mouse_y` por direção não moviam o cursor** — ao configurar `mouse_x` nas direções `left`/`right` e `mouse_y` em `up`/`down` manualmente (sem usar os checkboxes), o cursor não se movia. Causa: o bloco `else` de `_on_axes_update` iterava direções individualmente, acumulando `sx`/`sy` duas vezes (uma por lado), anulando o resultado. Corrigido com pré-varredura das 4 direções usando um `_seen` set que processa cada tipo contínuo (`mouse_x`, `mouse_y`, `scroll_v`, `scroll_h`) apenas uma vez, acumulando pelo valor bruto do eixo.
+- **Erro "Nome(s) de tecla não reconhecido(s): scroll_right"** — `scroll_right` e `scroll_left` não constavam na lista `_MOUSE_KEYS` do `bind_dialog.py` que faz bypass da validação do pyautogui para teclas de mouse/scroll. Adicionados à lista.
+
+### Commits
+
+- *(pendente)*
+
+---
+
 ## [v2.1.1] — 2026-03-10
 
 ### Corrigido

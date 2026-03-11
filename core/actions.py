@@ -48,6 +48,7 @@ if sys.platform == "win32":
     _MOUSEEVENTF_MIDDLEDOWN  = 0x0020
     _MOUSEEVENTF_MIDDLEUP    = 0x0040
     _MOUSEEVENTF_WHEEL       = 0x0800  # roda vertical
+    _MOUSEEVENTF_HWHEEL      = 0x1000  # roda horizontal
     _MOUSEEVENTF_XDOWN       = 0x0080  # botões laterais (mouse4/mouse5)
     _MOUSEEVENTF_XUP         = 0x0100
     _MOUSEEVENTF_ABSOLUTE    = 0x8000
@@ -91,6 +92,13 @@ if sys.platform == "win32":
         """Rola a roda do mouse via SendInput. delta positivo = cima, negativo = baixo."""
         inp = _INPUT(type=_INPUT_MOUSE)
         inp.mi.dwFlags   = _MOUSEEVENTF_WHEEL
+        inp.mi.mouseData = ctypes.c_ulong(delta & 0xFFFFFFFF)
+        ctypes.windll.user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
+
+    def _win_hscroll(delta: int) -> None:
+        """Rola horizontalmente via SendInput. delta positivo = direita, negativo = esquerda."""
+        inp = _INPUT(type=_INPUT_MOUSE)
+        inp.mi.dwFlags   = _MOUSEEVENTF_HWHEEL
         inp.mi.mouseData = ctypes.c_ulong(delta & 0xFFFFFFFF)
         ctypes.windll.user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
 
@@ -192,6 +200,16 @@ def execute_keyboard(key: str, hold_ms: int = 0) -> None:
                 _win_scroll(-_WHEEL_DELTA)
             else:
                 pyautogui.scroll(-1)
+        elif key == "scroll_right":
+            if _HAS_SENDINPUT:
+                _win_hscroll(_WHEEL_DELTA)
+            else:
+                pyautogui.keyDown("shift"); pyautogui.scroll(-1); pyautogui.keyUp("shift")
+        elif key == "scroll_left":
+            if _HAS_SENDINPUT:
+                _win_hscroll(-_WHEEL_DELTA)
+            else:
+                pyautogui.keyDown("shift"); pyautogui.scroll(1); pyautogui.keyUp("shift")
         elif key == "mouse4":
             if _HAS_SENDINPUT:
                 _win_xbutton(_XBUTTON1, True)
