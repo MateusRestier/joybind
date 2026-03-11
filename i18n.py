@@ -1,11 +1,25 @@
 """
-i18n.py — Internationalization module for JoyBind.
+i18n.py — Módulo de internacionalização do JoyBind.
 
-Usage:
+Idiomas suportados: "pt" (Português — padrão) e "en" (English).
+
+Uso básico:
     from i18n import t, set_lang
 
-    set_lang("en")          # or "pt"
-    label = t("btn_save")   # → "Save" or "Salvar"
+    set_lang("en")          # ou "pt"
+    label = t("btn_save")   # → "Save" / "Salvar"
+
+Funções utilitárias:
+    kb_suggestions()       → lista de sugestões de teclas para o BindDialog.
+    step_action_labels()   → mapa action_key → rótulo para a timeline de sequência.
+    analog_type_opts()     → opções de tipo de stick analógico (mouse / game / none).
+    step_plural(n)         → forma singular/plural de "passo" no idioma ativo.
+
+Chaves de string notáveis:
+    status_paused          → texto exibido quando toggle_pause está ativo.
+    action_toggle_pause    → rótulo do radio button "Pausar JoyBind".
+    tile_toggle_pause      → texto curto exibido no tile do botão pausado.
+    msg_toggle_pause_hint  → explicação do toggle_pause no BindDialog.
 """
 
 _lang: str = "en"

@@ -2,15 +2,31 @@
 gui/app.py — Janela principal do JoyBind.
 
 Layout:
-  Header → Preset bar → Controle → Status
+  Header (logo, preset bar, admin btn) → Status bar
   TabView:
-    [Botões]     — lista de mapeamentos + CRUD
-    [Analógicos] — dois painéis de analógico (esq/dir) com 4 botões de direção
+    [Botões]     — grid de tiles clicáveis + CRUD de mapeamentos
+    [Analógicos] — painéis de analógico (esq/dir) com 4 direções configuráveis
 
 Thread safety:
   • _on_button_press e _on_axes_update rodam na thread daemon do controller.
-  • Apenas pyautogui é chamado nessas threads (thread-safe).
+  • Apenas pyautogui / actions é chamado nessas threads (thread-safe).
   • Qualquer atualização de widget usa root.after(0, ...).
+
+Estado de pausa (toggle_pause):
+  • self._paused bloqueia _on_button_press e _on_axes_update.
+  • Apenas binds do tipo "toggle_pause" continuam funcionando enquanto pausado.
+  • O pause é resetado ao parar a escuta (_stop_listener).
+
+Tiles de botão:
+  • Cada tile é composto por um CTkButton (nome do botão, fonte 11) e um
+    CTkLabel abaixo (nome da bind, fonte 9) dentro de um clip frame de
+    tamanho fixo com pack_propagate(False), impedindo expansão por textos longos.
+  • self._btn_tiles: visual_id → CTkButton (título do tile)
+  • self._btn_bind_labels: visual_id → CTkLabel (label da bind)
+
+Classes auxiliares (no mesmo módulo):
+  AnalogDirectionDialog — configura as binds das 4 direções de um analógico.
+  AutoMapWizard         — wizard passo-a-passo de automapeamento de botões.
 """
 import threading
 import time
@@ -541,7 +557,20 @@ class AutoMapWizard:
 # ── Classe principal ───────────────────────────────────────────────────────
 
 class App:
-    """Classe principal que monta e gerencia a interface gráfica."""
+    """
+    Classe principal que monta e gerencia a interface gráfica do JoyBind.
+
+    Attributes:
+        root (CTk): Janela raiz do CustomTkinter.
+        cfg (dict): Configuração ativa (binds e analógico).
+
+        _is_listening (bool): True enquanto a escuta de controle estiver ativa.
+        _paused (bool): True enquanto o JoyBind estiver no modo pausa
+            (toggle_pause ativo). Bloqueia todas as binds exceto toggle_pause.
+        _btn_tiles (dict[str, CTkButton]): Mapa visual_id → tile principal do botão.
+        _btn_bind_labels (dict[str, CTkLabel]): Mapa visual_id → label da bind (2ª linha).
+        _layout (dict[str, str]): Mapa visual_id → btn_key (índice físico do botão).
+    """
 
     def __init__(self, root: ctk.CTk) -> None:
         self.root = root
@@ -1398,7 +1427,8 @@ class App:
     def _on_axes_update(self, axis_values: list[float]) -> None:
         """
         Chamado a 60 Hz pela thread daemon do controller.
-        Não toca em widgets — só pyautogui (thread-safe).
+        Não toca em widgets — só pyautogui / actions (thread-safe).
+        Retorna imediatamente se self._paused estiver ativo.
 
         Cada stick tem um modo independente (stick_mode):
           Esquerdo:

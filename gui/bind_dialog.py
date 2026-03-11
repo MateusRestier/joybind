@@ -2,16 +2,22 @@
 gui/bind_dialog.py — Diálogo modal para adicionar ou editar um mapeamento.
 
 Tipos de bind:
-  keyboard  → Pressiona uma tecla ao detectar o botão do controle.
-  sequence  → Executa uma sequência de ações definidas em "linha do tempo".
+  keyboard      → Pressiona uma tecla/clique de mouse ao detectar o botão.
+  sequence      → Executa uma sequência de ações definidas em "linha do tempo".
+  toggle_pause  → Suspende / retoma todas as outras binds (teclado, mouse e analógico).
+  none          → Mapeia o botão sem executar nenhuma ação.
 
 Fluxo:
   1. Usuário informa o Nº do botão (digitando ou capturando via controle).
-  2. Escolhe o tipo: Teclado ou Sequência de Ações.
-  3. Preenche os parâmetros.
+  2. Escolhe o tipo de ação via radio button.
+  3. Preenche os parâmetros (somente para keyboard e sequence).
   4. Clica em Salvar → self.result é preenchido e o diálogo fecha.
 
 A janela pai acessa `dlg.result` após `root.wait_window(dlg.dialog)`.
+
+Classes:
+  BindDialog     — diálogo completo (número de botão + tipo + parâmetros).
+  SequenceDialog — editor de timeline de ações standalone (usado por AnalogDirectionDialog).
 """
 import time
 import threading
