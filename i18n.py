@@ -235,6 +235,14 @@ _PT: dict[str, str] = {
     "warn_layout_unverified":
         "⚠ Mapeamento de botões não verificado — os tiles usam o layout Xbox padrão."
         " Use Auto-mapear para confirmar os botões do seu controle.",
+
+    # ── Admin mode ────────────────────────────────────────────────────────────
+    "btn_admin":       "🛡 Admin",
+    "msg_admin_title": "Modo Administrador",
+    "msg_admin_body":
+        "O JoyBind precisa de permissão de administrador para controlar apps protegidos"
+        " pelo Windows, como o teclado virtual (osk.exe).\n\n"
+        "Deseja reiniciar como administrador agora?",
 }
 
 _EN: dict[str, str] = {
@@ -415,6 +423,14 @@ _EN: dict[str, str] = {
     "warn_layout_unverified":
         "⚠ Button mapping not verified — tiles use the default Xbox layout."
         " Run Auto-map to confirm your controller's buttons.",
+
+    # ── Admin mode ────────────────────────────────────────────────────────────
+    "btn_admin":       "🛡 Admin",
+    "msg_admin_title": "Administrator Mode",
+    "msg_admin_body":
+        "JoyBind needs administrator permission to control apps protected by Windows,"
+        " such as the on-screen keyboard (osk.exe).\n\n"
+        "Restart as administrator now?",
 }
 
 

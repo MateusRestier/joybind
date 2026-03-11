@@ -21,6 +21,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 - **Aviso de layout não verificado** — quando um preset é aberto sem `btn_layout` confirmado, um label amarelo avisa o usuário que os tiles usam o layout padrão e sugere rodar o Auto-mapear. O aviso desaparece automaticamente ao mapear qualquer botão ou rodar o Auto-mapear.
 - **`settings.json` oculto** — arquivo de configuração marcado como oculto no Windows após cada gravação; não aparece na pasta do app no Explorer, mas continua funcionando normalmente.
+- **Botão Modo Administrador** — botão `🛡 Admin` no cabeçalho do app permite relançar o JoyBind com privilégios de administrador via UAC. Necessário para controlar apps protegidos pelo Windows como o teclado virtual (`osk.exe`). O botão aparece apenas quando o app já não está rodando como admin; ao clicar, um diálogo explica o motivo antes de pedir confirmação.
 
 ### Commits
 

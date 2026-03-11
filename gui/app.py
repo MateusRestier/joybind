@@ -33,8 +33,17 @@ from i18n import t, step_plural, analog_type_opts
 # ── Recursos ───────────────────────────────────────────────────────────────
 # Funciona tanto em desenvolvimento quanto em executável PyInstaller (onefile).
 import sys as _sys
+import ctypes as _ctypes
 _BASE = Path(_sys._MEIPASS) if getattr(_sys, "frozen", False) else Path(__file__).resolve().parent.parent
 _LOGO_PATH = _BASE / "img" / "logo.png"
+
+
+def _is_admin() -> bool:
+    """Retorna True se o processo atual roda com privilégios de administrador."""
+    try:
+        return bool(_ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
 
 # ── Cores ──────────────────────────────────────────────────────────────────
 _COLOR_ACTIVE          = "#2ecc71"
@@ -697,6 +706,23 @@ class App:
             hover_color=_active_hov if _cur == "pt" else _inactive_hov,
             command=lambda: self._on_lang_change("pt"),
         ).pack(pady=(2, 0))
+
+        # Admin button — visível apenas quando não roda como administrador
+        if not _is_admin():
+            admin_frame = ctk.CTkFrame(frame, fg_color="transparent")
+            admin_frame.grid(
+                row=0, column=col_text + 2, rowspan=2,
+                padx=(0, 14), pady=10, sticky="e",
+            )
+            ctk.CTkButton(
+                admin_frame,
+                text=t("btn_admin"),
+                width=76, height=26,
+                font=ctk.CTkFont(size=11),
+                fg_color=("gray65", "gray30"),
+                hover_color=("gray55", "gray40"),
+                command=self._on_admin_btn_click,
+            ).pack()
 
     def _build_preset_bar(self) -> None:
         frame = ctk.CTkFrame(self.root)
@@ -1794,6 +1820,28 @@ class App:
         self._refresh_preset_dropdown()
         self._update_btn_tiles()
         self._render_analog_config()
+
+    def _on_admin_btn_click(self) -> None:
+        """Pergunta ao usuário e relança o app como administrador se confirmado."""
+        confirmed = messagebox.askyesno(
+            t("msg_admin_title"),
+            t("msg_admin_body"),
+        )
+        if not confirmed:
+            return
+        exe = _sys.executable
+        exe_dir = str(Path(exe).parent)
+        if getattr(_sys, "frozen", False):
+            # Modo executável: relança o próprio .exe como admin
+            _ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, "", exe_dir, 1)
+        else:
+            # Modo desenvolvimento: relança python com main.py
+            main_script = str(Path(__file__).parent.parent / "main.py")
+            _ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", exe, f'"{main_script}"', exe_dir, 1,
+            )
+        self.shutdown()
+        _sys.exit(0)
 
     def shutdown(self) -> None:
         try:
