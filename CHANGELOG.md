@@ -30,6 +30,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 - `c826062` build: compile to local temp dir to avoid Google Drive file locking
 - `ecb5bff` docs(changelog): v2.1.1 — portabilidade, aviso de layout e fix de build
 - `94e7b41` fix: hide settings.json and restore layout fallback for old presets
+- `1ef91f8` feat(ui): add Admin Mode button to header for UAC elevation
 
 ---
 
