@@ -20,7 +20,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Commits
 
-- *(pendente)*
+- `e2a93ef` feat: scroll horizontal bind + fix analog direction binds in none mode
 
 ---
 
