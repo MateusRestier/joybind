@@ -106,6 +106,7 @@ _PT: dict[str, str] = {
     # ── Status ────────────────────────────────────────────────────────────────
     "status_stopped":   "  Parado",
     "status_active":    "  Ativo",
+    "status_paused":    "  Pausado",
     "status_no_ctrl":   "Nenhum controle encontrado",
     "status_waiting":   "Aguardando…",
     "status_press_btn": "Pressione um botão...",
@@ -165,6 +166,12 @@ _PT: dict[str, str] = {
         "Nenhuma ação ainda.\nUse o menu abaixo para adicionar passos.",
     "msg_no_action_hint":
         "Nenhuma ação — o botão é mapeado sem executar nada.",
+    "msg_toggle_pause_hint":
+        "⏸  Pausar / Retomar JoyBind\n\n"
+        "Ao pressionar este botão, todas as outras binds param de funcionar "
+        "(teclado, mouse e analógico).\n"
+        "Pressionar novamente retoma tudo normalmente.\n\n"
+        "Útil para usar o controle normalmente num jogo sem o JoyBind interferir.",
     "msg_click_dir":        "Clique em uma direção para configurar",
     "msg_automap_hint":
         "Pressione cada botão no controle quando solicitado.",
@@ -206,9 +213,11 @@ _PT: dict[str, str] = {
     "type_mouse":    "MOUSE",
 
     # ── Action type radio buttons ─────────────────────────────────────────────
-    "action_none":     "Nenhuma",
-    "action_key":      "Tecla / Clique",
-    "action_sequence": "Sequência de Ações",
+    "action_none":          "Nenhuma",
+    "action_key":           "Tecla / Clique",
+    "action_sequence":      "Sequência de Ações",
+    "action_toggle_pause":  "Pausar JoyBind",
+    "tile_toggle_pause":    "⏸ pausar",
 
     # ── Word parts ────────────────────────────────────────────────────────────
     "word_step":     "passo",
@@ -295,6 +304,7 @@ _EN: dict[str, str] = {
     # ── Status ────────────────────────────────────────────────────────────────
     "status_stopped":   "  Stopped",
     "status_active":    "  Active",
+    "status_paused":    "  Paused",
     "status_no_ctrl":   "No controller found",
     "status_waiting":   "Waiting…",
     "status_press_btn": "Press a button...",
@@ -353,6 +363,12 @@ _EN: dict[str, str] = {
         "No actions yet.\nUse the menu below to add steps.",
     "msg_no_action_hint":
         "No action — the button is mapped without executing anything.",
+    "msg_toggle_pause_hint":
+        "⏸  Pause / Resume JoyBind\n\n"
+        "Pressing this button stops all other binds from working "
+        "(keyboard, mouse and analog).\n"
+        "Pressing it again resumes everything normally.\n\n"
+        "Useful for using the controller normally in a game without JoyBind interfering.",
     "msg_click_dir":        "Click a direction to configure",
     "msg_automap_hint":
         "Press each button on the controller when prompted.",
@@ -394,9 +410,11 @@ _EN: dict[str, str] = {
     "type_mouse":    "MOUSE",
 
     # ── Action type radio buttons ─────────────────────────────────────────────
-    "action_none":     "None",
-    "action_key":      "Key / Click",
-    "action_sequence": "Action Sequence",
+    "action_none":          "None",
+    "action_key":           "Key / Click",
+    "action_sequence":      "Action Sequence",
+    "action_toggle_pause":  "Pause JoyBind",
+    "tile_toggle_pause":    "⏸ pause",
 
     # ── Word parts ────────────────────────────────────────────────────────────
     "word_step":     "step",

@@ -568,8 +568,11 @@ class App:
 
         # ── Estado geral ──────────────────────────────────────────────
         self._is_listening = False
+        self._paused = False
         # Tiles clicáveis do layout visual: visual_id → CTkButton
         self._btn_tiles: dict[str, ctk.CTkButton] = {}
+        # Labels de bind (segunda linha) dos tiles: visual_id → CTkLabel
+        self._btn_bind_labels: dict[str, ctk.CTkLabel] = {}
 
         # ── Estado analógico ──────────────────────────────────────────
         self._acc_x:  float = 0.0
@@ -940,17 +943,37 @@ class App:
         """Cria um tile clicável para um botão físico do controle."""
         btn_key = self._layout.get(visual_id)
         key_label = btn_key if btn_key is not None else "—"
+        bind_text = self._btn_tile_text(btn_key)
+        _LBL_H = 14
+        container = ctk.CTkFrame(parent, fg_color="transparent")
+        container.grid(row=r, column=c, padx=3, pady=3)
+        # clip: frame transparente de tamanho fixo.
+        # pack_propagate(False) impede que o botão expanda além de w×h.
+        clip = ctk.CTkFrame(container, fg_color="transparent", width=w, height=h)
+        clip.pack()
+        clip.pack_propagate(False)
         btn = ctk.CTkButton(
-            parent,
-            text=f"{visual_id} ({key_label})\n{self._btn_tile_text(btn_key)}",
-            width=w, height=h,
+            clip,
+            text=f"{visual_id} ({key_label})",
+            height=h - _LBL_H,
             fg_color=("gray68", "gray28"),
             hover_color=("gray58", "gray38"),
             font=ctk.CTkFont(size=11),
             command=lambda vid=visual_id: self._on_btn_tile_click(vid),
         )
-        btn.grid(row=r, column=c, padx=3, pady=3)
+        btn.pack(fill="x")
+        bind_lbl = ctk.CTkLabel(
+            clip,
+            text=bind_text,
+            height=_LBL_H,
+            font=ctk.CTkFont(size=9),
+            text_color=("gray45", "gray65"),
+            fg_color="transparent",
+            anchor="center",
+        )
+        bind_lbl.pack(fill="x")
         self._btn_tiles[visual_id] = btn
+        self._btn_bind_labels[visual_id] = bind_lbl
         return btn
 
     def _mouse_key_display(self) -> dict[str, str]:
@@ -984,6 +1007,8 @@ class App:
             return base
         if t == "mouse_combo":
             return "\U0001f5b1 mouse"
+        if t == "toggle_pause":
+            return i18n.t("tile_toggle_pause")
         if t == "none":
             return "—"
         return "—"
@@ -1037,7 +1062,9 @@ class App:
         for vid, btn in self._btn_tiles.items():
             btn_key = self._layout.get(vid)
             key_label = btn_key if btn_key is not None else "—"
-            btn.configure(text=f"{vid} ({key_label})\n{self._btn_tile_text(btn_key)}")
+            btn.configure(text=f"{vid} ({key_label})")
+            if vid in self._btn_bind_labels:
+                self._btn_bind_labels[vid].configure(text=self._btn_tile_text(btn_key))
         self._update_analog_btn_states()
 
     def _on_clear_binds(self) -> None:
@@ -1383,6 +1410,8 @@ class App:
             "game"   → move o cursor (câmera no jogo)
             "none"   → key bindings manuais por direção
         """
+        if self._paused:
+            return
         analog  = self.cfg.get("analog", {})
         sticks  = analog.get("sticks", [])
         dx = dy = sv = sh = 0.0
@@ -1710,6 +1739,7 @@ class App:
             text=t("btn_start_listen"),
             fg_color=_COLOR_BTN_START, hover_color=_COLOR_BTN_START_HOVER,
         )
+        self._paused = False
         self._status_label.configure(text=t("status_stopped"), text_color=_COLOR_STOPPED)
         self._refresh_btn.configure(state="normal")
 
@@ -1723,8 +1753,24 @@ class App:
         if not bind:
             return
 
+        # Quando pausado, só processa toggle_pause — ignora todo o resto.
+        if self._paused and bind.get("type") != "toggle_pause":
+            return
+
         def run() -> None:
             btype = bind["type"]
+            if btype == "toggle_pause":
+                self._paused = not self._paused
+                if self._paused:
+                    label_text = t("status_paused")
+                    self.root.after(0, lambda: self._status_label.configure(
+                        text=label_text, text_color="#e67e22",
+                    ))
+                else:
+                    self.root.after(0, lambda: self._status_label.configure(
+                        text=t("status_active"), text_color=_COLOR_ACTIVE,
+                    ))
+                return
             if btype == "keyboard":
                 macro_ms = bind.get("macro_interval_ms", 0)
                 if macro_ms > 0:
@@ -1824,6 +1870,7 @@ class App:
 
         # Reseta variáveis de UI que serão recriadas pelo _build_ui.
         self._btn_tiles = {}
+        self._btn_bind_labels = {}
         self._layout_warning_label = None
         self._left_stick_frame = None
         self._right_stick_frame = None
@@ -1840,6 +1887,13 @@ class App:
         self._refresh_preset_dropdown()
         self._update_btn_tiles()
         self._render_analog_config()
+        if self._is_listening:
+            self._toggle_btn.configure(
+                text=t("btn_stop_listen"),
+                fg_color=_COLOR_BTN_STOP, hover_color=_COLOR_BTN_STOP_HOVER,
+            )
+            self._status_label.configure(text=t("status_active"), text_color=_COLOR_ACTIVE)
+            self._refresh_btn.configure(state="disabled")
 
     def _on_admin_btn_click(self) -> None:
         """Pergunta ao usuário e relança o app como administrador se confirmado."""

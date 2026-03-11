@@ -6,6 +6,20 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [v2.2.0] — 2026-03-11
+
+### Adicionado
+
+- **Bind "Pausar JoyBind" (`toggle_pause`)** — novo tipo de bind que suspende todas as outras binds (teclado, mouse e analógico) ao ser pressionado e as retoma ao ser pressionado novamente. Status exibido em laranja na barra de status. Útil para usar o controle normalmente num jogo sem interferência do JoyBind.
+- **Tiles de botão com duas linhas** — o tile de cada botão do controle agora exibe o nome do botão em fonte maior e a bind mapeada em fonte menor abaixo, sem expandir além do tamanho padrão (clip frame com `pack_propagate(False)`).
+
+### Corrigido
+
+- **Troca de idioma com escuta ativa** — ao trocar o idioma enquanto a escuta estava ativa, o botão voltava visualmente ao estado desativado, mas as binds continuavam funcionando. O estado visual agora é restaurado corretamente após a reconstrução da UI.
+- **Analógico não pausava com `toggle_pause`** — o analógico continuava processando mesmo após o pause. Corrigido com guard `if self._paused: return` em `_on_axes_update`.
+
+---
+
 ## [v2.1.2] — 2026-03-11
 
 ### Adicionado

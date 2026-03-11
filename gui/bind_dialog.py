@@ -159,25 +159,30 @@ class BindDialog:
 
         ctk.CTkLabel(
             type_frame, text=t("lbl_action"), font=ctk.CTkFont(weight="bold")
-        ).pack(side="left", padx=(0, 14))
+        ).pack(side="left", padx=(0, 10))
 
         # "none" é o padrão — ação é opcional
         self._type_var = ctk.StringVar(value="none")
         ctk.CTkRadioButton(
-            type_frame, text=t("action_none"),
+            type_frame, text=t("action_none"), width=1,
             variable=self._type_var, value="none",
             command=self._on_type_change,
-        ).pack(side="left", padx=6)
+        ).pack(side="left", padx=(0, 16))
         ctk.CTkRadioButton(
-            type_frame, text=t("action_key"),
+            type_frame, text=t("action_key"), width=1,
             variable=self._type_var, value="keyboard",
             command=self._on_type_change,
-        ).pack(side="left", padx=6)
+        ).pack(side="left", padx=(0, 16))
         ctk.CTkRadioButton(
-            type_frame, text=t("action_sequence"),
+            type_frame, text=t("action_sequence"), width=1,
             variable=self._type_var, value="sequence",
             command=self._on_type_change,
-        ).pack(side="left", padx=6)
+        ).pack(side="left", padx=(0, 16))
+        ctk.CTkRadioButton(
+            type_frame, text=t("action_toggle_pause"), width=1,
+            variable=self._type_var, value="toggle_pause",
+            command=self._on_type_change,
+        ).pack(side="left")
 
         # ── Área de conteúdo condicional ──────────────────────────
         self._fields_container = ctk.CTkFrame(self.dialog, fg_color="transparent")
@@ -194,6 +199,16 @@ class BindDialog:
             text=t("msg_no_action_hint"),
             text_color=("gray50", "gray55"),
             font=ctk.CTkFont(size=12, slant="italic"),
+        )
+
+        # Hint exibido quando "Pausar JoyBind" está selecionado
+        self._pause_hint = ctk.CTkLabel(
+            self._fields_container,
+            text=t("msg_toggle_pause_hint"),
+            text_color=("gray40", "gray65"),
+            font=ctk.CTkFont(size=12),
+            justify="left",
+            wraplength=460,
         )
 
         # ── Separador + botões de confirmação ─────────────────────
@@ -421,11 +436,14 @@ class BindDialog:
         self._kb_frame.pack_forget()
         self._seq_frame.pack_forget()
         self._none_hint.pack_forget()
+        self._pause_hint.pack_forget()
         typ = self._type_var.get()
         if typ == "keyboard":
             self._kb_frame.pack(fill="both", expand=True)
         elif typ == "sequence":
             self._seq_frame.pack(fill="both", expand=True)
+        elif typ == "toggle_pause":
+            self._pause_hint.pack(pady=20, padx=8, anchor="w")
         else:
             self._none_hint.pack(pady=20)
 
@@ -934,6 +952,9 @@ class BindDialog:
         elif bind_type == "none":
             self._type_var.set("none")
 
+        elif bind_type == "toggle_pause":
+            self._type_var.set("toggle_pause")
+
         elif bind_type == "mouse_combo":
             # Compatibilidade retroativa: converte para sequência equivalente.
             # "Salvar e restaurar posição" vira a checkbox do move_mouse.
@@ -1039,6 +1060,9 @@ class BindDialog:
 
         elif bind_type == "none":
             bind_data = {"type": "none"}
+
+        elif bind_type == "toggle_pause":
+            bind_data = {"type": "toggle_pause"}
 
         else:
             return
